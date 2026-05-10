@@ -1,0 +1,8 @@
+ui/node_modules/
+ui/.vite/
+ui/*.tsbuildinfo
+ui/vite.config.js
+ui/vite.config.d.ts
+*.log
+*.tmp
+server/server-config.local.lua

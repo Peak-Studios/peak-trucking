@@ -1,0 +1,32 @@
+# Enforce LF line endings in the repository for all text files
+* text=auto eol=lf
+
+# Lua source files
+*.lua text eol=lf
+
+# Web / TypeScript
+*.ts   text eol=lf
+*.tsx  text eol=lf
+*.js   text eol=lf
+*.jsx  text eol=lf
+*.css  text eol=lf
+*.html text eol=lf
+*.json text eol=lf
+
+# Markdown & docs
+*.md   text eol=lf
+
+# Config files
+*.cfg    text eol=lf
+*.toml   text eol=lf
+*.yaml   text eol=lf
+*.yml    text eol=lf
+
+# Binary files — no conversion
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.woff binary
+*.woff2 binary
