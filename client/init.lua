@@ -222,6 +222,13 @@ exports('IsClientReady',          function() return Peak.Client.Ready           
 exports('GetPlayerData',          function() return Peak.Client.GetPlayerData() end)
 exports('GetPlayerJob',           function() return Peak.Client.GetPlayerJob()  end)
 
+--- Returns the framework object and its name.
+--- Used by legacy bridge code.
+--- @return table, string
+function GetCore()
+    return Peak.Client.FrameworkObject, Peak.Client.FrameworkName
+end
+
 -- ============================================================
 -- STARTUP
 -- ============================================================

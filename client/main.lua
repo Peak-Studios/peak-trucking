@@ -25,8 +25,13 @@ illegal = false
 -- ============================================================
 
 CreateThread(function()
-  Config.Framework = select(2, GetCore())
+  while Core == nil do
+    Wait(0)
+  end
+
   Core = GetCore()
+  Config.Framework = select(2, GetCore())
+
   InitNPCInteraction()
   SetPlayerJob()
 end)

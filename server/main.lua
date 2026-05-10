@@ -23,12 +23,12 @@ end)
 
 -- Core Initialization
 CreateThread(function()
-  Config.Framework = select(2, GetCore())
-  Core = GetCore()
-
   while Core == nil do
     Wait(0)
   end
+
+  Core = GetCore()
+  Config.Framework = select(2, GetCore())
 
   -- Register callback for checking mission unlock status
   RegisterCallback("peak-trucking:CheckMissionUnlocked", function(playerId, cb, missionId)

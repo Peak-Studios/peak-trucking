@@ -139,6 +139,13 @@ exports('GetFramework',      function() return Peak.Server.FrameworkObject end)
 exports('GetFrameworkName',  function() return Peak.Server.FrameworkName   end)
 exports('IsServerReady',     function() return Peak.Server.Ready           end)
 
+--- Returns the framework object and its name.
+--- Used by legacy bridge code.
+--- @return table, string
+function GetCore()
+    return Peak.Server.FrameworkObject, Peak.Server.FrameworkName
+end
+
 -- ============================================================
 -- STARTUP
 -- ============================================================
