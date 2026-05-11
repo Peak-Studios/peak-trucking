@@ -83,6 +83,11 @@ export default function App() {
   useEffect(() => {
     const keyHandler = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        if (isEditingHud) {
+          setIsEditingHud(false)
+          void fetchNui('save_hud_pos')
+          return
+        }
         setIsOpen(false)
         void fetchNui('close')
       }

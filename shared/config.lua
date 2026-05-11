@@ -23,6 +23,9 @@ Config.Target = 'auto'
 -- Progress Bar: 'auto', 'progressbar', 'wait'
 Config.Progress = 'auto'
 
+-- Fuel System: 'native', 'ox_fuel', 'legacyfuel', 'ps-fuel'
+Config.Fuel = 'ox_fuel'
+
 Config.Debug               = false
 Config.EnableGhostMode     = true    -- if true players can't collide with each other in the vehicle spawn area
 Config.DefaultImage        = './assets/images/test-pp.png'

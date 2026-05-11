@@ -66,10 +66,15 @@ function TriggerCallback(callbackName, data)
       result = response
     end, data)
   else
-    Core.Functions.TriggerCallback(callbackName, function(response)
-      status = "SUCCESS"
-      result = response
-    end, data)
+    if Core and Core.Functions and Core.Functions.TriggerCallback then
+      Core.Functions.TriggerCallback(callbackName, function(response)
+        status = "SUCCESS"
+        result = response
+      end, data)
+    else
+      Peak.Utils.Warn('TriggerCallback failed: Core.Functions.TriggerCallback is nil. Framework:', Config.Framework)
+      status = "FAILED"
+    end
   end
 
   CreateThread(function()
@@ -92,6 +97,19 @@ function TriggerCallback(callbackName, data)
   end
 
   return result
+end
+
+local function GetFuel(vehicle)
+  if not DoesEntityExist(vehicle) then return 0 end
+  if Config.Fuel == 'ox_fuel' then
+    return Entity(vehicle).state.fuel or GetVehicleFuelLevel(vehicle)
+  elseif Config.Fuel == 'legacyfuel' then
+    return exports.LegacyFuel:GetFuel(vehicle)
+  elseif Config.Fuel == 'ps-fuel' then
+    return exports['ps-fuel']:GetFuel(vehicle)
+  else
+    return GetVehicleFuelLevel(vehicle)
+  end
 end
 
 --- Blocks execution until nuiReady is true.
@@ -178,6 +196,8 @@ CreateThread(function()
 end)
 
 RegisterNUICallback("close", function(data, cb)
+  isEditingHud = false
+  NuiMessage("toggle_hud_edit", { editing = false })
   SetNuiFocus(false, false)
   if DoesCamExist(cam) then
     RenderScriptCams(false, true, 500, true, true)
@@ -653,7 +673,7 @@ RegisterNUICallback("startJob", function(data, cb)
     CreateThread(function()
       while DoesEntityExist(truckVehicle) do
         setJobInfo("bodyHealth", GetVehicleBodyHealth(truckVehicle) / 10)
-        setJobInfo("fuel", GetVehicleFuelLevel(truckVehicle))
+        setJobInfo("fuel", GetFuel(truckVehicle))
         Wait(2000)
       end
     end)
@@ -1303,7 +1323,7 @@ end)
 
 RegisterNUICallback("save_hud_pos", function(data, cb)
   isEditingHud = false
+  NuiMessage("toggle_hud_edit", { editing = false })
   SetNuiFocus(false, false)
-  -- Optionally save to server/KV here, but we'll use localStorage for simplicity
   ResolveNuiCallback(cb)
 end)

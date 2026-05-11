@@ -1,6 +1,6 @@
 {
   "peak-trucking": {
-    "version": "0.2.0",
-    "changelog": "UI overhaul and added /truckhud feature."
+    "version": "0.2.1",
+    "changelog": "Fixed HUD stuck issue and added ox_fuel support."
   }
 }

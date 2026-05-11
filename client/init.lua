@@ -41,7 +41,11 @@ local function InitializeFramework()
         Core = Peak.Client.FrameworkObject
         Peak.Utils.print('Framework detected: ^5QBCore^0')
     elseif fw == 'qbox' then
-        local ok, obj = pcall(function() return exports.qbx_core:GetCoreObject() end)
+        local ok, obj = pcall(function() return exports['qb-core']:GetCoreObject() end)
+        if not (ok and obj) then
+            ok, obj = pcall(function() return exports['qbx_core']:GetCoreObject() end)
+        end
+
         if ok and obj then
             Peak.Client.FrameworkObject = obj
         else
