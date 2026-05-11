@@ -1,6 +1,6 @@
 {
   "peak-trucking": {
-    "version": "0.1.0",
-    "changelog": "Initial public release."
+    "version": "0.2.0",
+    "changelog": "UI overhaul and added /truckhud feature."
   }
 }

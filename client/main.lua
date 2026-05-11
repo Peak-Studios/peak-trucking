@@ -1282,3 +1282,28 @@ function WaitPlayer()
     end
   end
 end
+
+-- ============================================================
+-- HUD REPOSITIONING
+-- ============================================================
+
+local isEditingHud = false
+
+RegisterCommand("truckhud", function()
+  isEditingHud = not isEditingHud
+  if isEditingHud then
+    NuiMessage("toggle_hud_edit", { editing = true })
+    SetNuiFocus(true, true)
+    createNotification(Config.Language.edit_hud_hint or "HUD Edit Mode: Drag to move. Press ESC or run /truckhud again to save.")
+  else
+    NuiMessage("toggle_hud_edit", { editing = false })
+    SetNuiFocus(false, false)
+  end
+end)
+
+RegisterNUICallback("save_hud_pos", function(data, cb)
+  isEditingHud = false
+  SetNuiFocus(false, false)
+  -- Optionally save to server/KV here, but we'll use localStorage for simplicity
+  ResolveNuiCallback(cb)
+end)

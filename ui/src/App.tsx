@@ -37,6 +37,7 @@ export default function App() {
   const [keybinds, setKeybinds] = useState<KeyBinds>(isFiveM() ? {} : mockKeyBinds)
   const [notifications, setNotifications] = useState<string[]>([])
   const [showPhone, setShowPhone] = useState(false)
+  const [isEditingHud, setIsEditingHud] = useState(false)
   const [selectedMission, setSelectedMission] = useState<Mission | undefined>()
   const [selectedRoute, setSelectedRoute] = useState<Route | undefined>()
   const [selectedTruck, setSelectedTruck] = useState<Truck | undefined>()
@@ -75,6 +76,9 @@ export default function App() {
     void playSound('./trevor-phonecall.mp3', 0.4)
   }, []))
   useNuiEvent<void>('declineillegal', useCallback(() => setShowPhone(false), []))
+  useNuiEvent<{ editing: boolean }>('toggle_hud_edit', useCallback((payload) => {
+    setIsEditingHud(payload?.editing ?? false)
+  }, []))
 
   useEffect(() => {
     const keyHandler = (event: KeyboardEvent) => {
@@ -101,7 +105,7 @@ export default function App() {
   return (
     <>
       <NotificationStack notifications={notifications} menuOpen={isOpen} />
-      <JobHud jobInfo={jobInfo} language={language} keybinds={keybinds} />
+      <JobHud jobInfo={jobInfo} language={language} keybinds={keybinds} isEditing={isEditingHud} />
       <PhoneCall visible={showPhone} />
 
       {isOpen && (

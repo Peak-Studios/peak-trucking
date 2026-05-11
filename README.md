@@ -16,6 +16,7 @@ Peak Trucking is a premium open-source FiveM trucking resource with persistent d
 - Daily mission progress and reset handling
 - Leaderboard data stored in SQL
 - Optional illegal cargo side job
+- Movable Job HUD via `/truckhud` command with persistence
 - Framework support for QBCore and ESX (modern and legacy)
 - Inventory support for `ox_inventory`, `qb_inventory`, `esx_inventory`, and `qs_inventory`
 - Interaction support for `drawtext`, `ox_target`, `qb_target`, `qb_textui`, and `esx_textui`
