@@ -2,7 +2,7 @@ fx_version 'cerulean'
 game 'gta5'
 author 'Peak Studios'
 description 'Peak Trucking'
-version '0.2.3'
+version '0.2.4'
 lua54 'yes'
 
 shared_scripts {
