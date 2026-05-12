@@ -71,6 +71,7 @@ export type JobInfo = {
   bodyHealth?: number
   fuel?: number
   routeHeader?: string
+  boxProgress?: string
 }
 
 export type LeaderboardEntry = {

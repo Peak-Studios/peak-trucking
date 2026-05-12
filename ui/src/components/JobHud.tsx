@@ -90,6 +90,16 @@ export function JobHud({ jobInfo, language, keybinds, isEditing }: Props) {
               <Meter label={language.trailer_quality ?? 'Trailer Quality'} value={Math.max(0, Math.min(100, jobInfo.bodyHealth ?? 0))} />
               <Meter label={language.truck_fuel ?? 'Truck Fuel'} value={Math.max(0, Math.min(100, jobInfo.fuel ?? 0))} />
             </div>
+            {jobInfo.boxProgress && (
+              <div className="metric-row" style={{ marginTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '8px' }}>
+                <div className="meter">
+                  <div>
+                    <span>{language.box_progress ?? 'Cargo Progress'}</span>
+                    <strong>{jobInfo.boxProgress}</strong>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="key-row">
               <kbd>H</kbd><span>{language.detach_trailer ?? 'Detach Trailer'}</span>
               <kbd>{keybinds.mark_location?.label ?? 'G'}</kbd><span>{language.mark_location ?? 'Mark Location'}</span>

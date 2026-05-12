@@ -70,6 +70,7 @@ Config.IllegalNPC = {
   model = `s_m_y_dealer_01`,
   boardLocation = vector3(897.32, -3267.95, 5.5),
   money = 10000,
+  xp_bonus = 1000,
   item_name = "illegal_box",
 }
 
@@ -1333,17 +1334,33 @@ Config.Missions = {
 }
 
 
-Config.FuelSystem = "cdn-fuel"                        -- LegacyFuel / x-fuel
+Config.SetVehicleFuel = function(vehicle, fuel_level)
+  if not DoesEntityExist(vehicle) then return end
+  fuel_level = fuel_level + 0.0
 
-Config.SetVehicleFuel = function(vehicle, fuel_level) -- you can change LegacyFuel export if you use another fuel system
-  if Config.FuelSystem == 'LegacyFuel' then
-    return exports["LegacyFuel"]:SetFuel(vehicle, fuel_level)
-  elseif Config.FuelSystem == 'x-fuel' then
-    return exports["x-fuel"]:SetFuel(vehicle, fuel_level)
-  elseif Config.FuelSystem == 'cdn-fuel' then
-    return exports['cdn-fuel']:SetFuel(vehicle, fuel_level)
+  -- ox_fuel (State Bags)
+  if GetResourceState('ox_fuel') == 'started' then
+    Entity(vehicle).state.fuel = fuel_level
+    return
+  end
+
+  -- Configured Systems
+  local system = Config.Fuel
+  if system == 'ox_fuel' then
+    Entity(vehicle).state.fuel = fuel_level
+  elseif system == 'legacyfuel' or system == 'LegacyFuel' then
+    pcall(function() exports["LegacyFuel"]:SetFuel(vehicle, fuel_level) end)
+  elseif system == 'ps-fuel' then
+    pcall(function() exports['ps-fuel']:SetFuel(vehicle, fuel_level) end)
+  elseif system == 'ti_fuel' then
+    pcall(function() exports['ti_fuel']:setFuel(vehicle, fuel_level) end)
+  elseif system == 'okokGasStation' then
+    pcall(function() exports['okokGasStation']:SetFuel(vehicle, fuel_level) end)
+  elseif system == 'cdn-fuel' then
+    local ok = pcall(function() exports['cdn-fuel']:SetFuel(vehicle, fuel_level) end)
+    if not ok then pcall(function() exports['cdn-fuel']:SetVehicleFuel(vehicle, fuel_level) end) end
   else
-    return SetVehicleFuelLevel(vehicle, fuel_level + 0.0)
+    SetVehicleFuelLevel(vehicle, fuel_level)
   end
 end
 
@@ -1355,31 +1372,33 @@ Config.RemoveVehicleSystem =
 "qb-vehiclekeys"                                             -- cd_garage / qs-vehiclekeys / wasabi-carlock / qb-vehiclekeys
 
 Config.GiveVehicleKey      = function(plate, model, vehicle) -- you can change vehiclekeys export if you use another vehicle key system
-  if Config.Vehiclekey then
-    if Config.VehicleSystem == 'cd_garage' then
-      TriggerEvent('cd_garage:AddKeys', exports['cd_garage']:GetPlate(vehicle))
-    elseif Config.VehicleSystem == 'qs-vehiclekeys' then
-      model = GetDisplayNameFromVehicleModel(GetEntityModel(vehicle))
-      exports['qs-vehiclekeys']:GiveKeys(plate, model, true)
-    elseif Config.VehicleSystem == 'wasabi-carlock' then
-      exports.wasabi_carlock:GiveKey(plate)
-    elseif Config.VehicleSystem == 'qb-vehiclekeys' then
-      TriggerServerEvent('qb-vehiclekeys:server:AcquireVehicleKeys', plate)
-    end
+  if not Config.Vehiclekey then return end
+  local system = Config.VehicleSystem
+
+  if system == 'cd_garage' then
+    pcall(function() TriggerEvent('cd_garage:AddKeys', exports['cd_garage']:GetPlate(vehicle)) end)
+  elseif system == 'qs-vehiclekeys' then
+    model = GetDisplayNameFromVehicleModel(GetEntityModel(vehicle))
+    pcall(function() exports['qs-vehiclekeys']:GiveKeys(plate, model, true) end)
+  elseif system == 'wasabi-carlock' or system == 'wasabi_carlock' then
+    pcall(function() exports.wasabi_carlock:GiveKey(plate) end)
+  elseif system == 'qb-vehiclekeys' then
+    TriggerServerEvent('qb-vehiclekeys:server:AcquireVehicleKeys', plate)
   end
 end
 
 Config.RemoveVehiclekey    = function(plate, model, vehicle)
-  if Config.Removekeys then
-    if Config.RemoveVehicleSystem == 'cd_garage' then
-      TriggerServerEvent('cd_garage:RemovePersistentVehicles', exports['cd_garage']:GetPlate(vehicle))
-    elseif Config.RemoveVehicleSystem == 'qs-vehiclekeys' then
-      model = GetDisplayNameFromVehicleModel(GetEntityModel(vehicle))
-      exports['qs-vehiclekeys']:RemoveKeys(plate, model)
-    elseif Config.RemoveVehicleSystem == 'wasabi-carlock' then
-      exports.wasabi_carlock:RemoveKey(plate)
-    elseif Config.RemoveVehicleSystem == 'qb-vehiclekeys' then
-      TriggerServerEvent('qb-vehiclekeys:client:RemoveKeys', plate)
-    end
+  if not Config.Removekeys then return end
+  local system = Config.RemoveVehicleSystem
+
+  if system == 'cd_garage' then
+    pcall(function() TriggerServerEvent('cd_garage:RemovePersistentVehicles', exports['cd_garage']:GetPlate(vehicle)) end)
+  elseif system == 'qs-vehiclekeys' then
+    model = GetDisplayNameFromVehicleModel(GetEntityModel(vehicle))
+    pcall(function() exports['qs-vehiclekeys']:RemoveKeys(plate, model) end)
+  elseif system == 'wasabi-carlock' or system == 'wasabi_carlock' then
+    pcall(function() exports.wasabi_carlock:RemoveKey(plate) end)
+  elseif system == 'qb-vehiclekeys' then
+    TriggerServerEvent('qb-vehiclekeys:client:RemoveKeys', plate)
   end
 end

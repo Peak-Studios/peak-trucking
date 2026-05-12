@@ -151,15 +151,19 @@ function AddInventoryItem(source, item, amount)
     if amount <= 0 then return false end
 
     local inv = Config.Inventory
-    if inv == 'ox_inventory' or inv == 'auto' and GetResourceState('ox_inventory') == 'started' then
-        return exports.ox_inventory:AddItem(source, item, amount) == true
-    elseif inv == 'qs_inventory' then
-        return exports['qs-inventory']:AddItem(source, item, amount) == true
+    if inv == 'ox_inventory' or (inv == 'auto' and GetResourceState('ox_inventory') == 'started') then
+        local ok, res = pcall(function() return exports.ox_inventory:AddItem(source, item, amount) end)
+        return ok and res
+    elseif inv == 'qs_inventory' or (inv == 'auto' and GetResourceState('qs-inventory') == 'started') then
+        local ok, res = pcall(function() return exports['qs-inventory']:AddItem(source, item, amount) end)
+        return ok and res
+    elseif inv == 'qb_inventory' or (inv == 'auto' and GetResourceState('qb-inventory') == 'started') then
+        if player.Functions and player.Functions.AddItem then
+            return player.Functions.AddItem(item, amount)
+        end
     elseif Peak.Server.FrameworkName == 'esx' or inv == 'esx_inventory' then
         player.addInventoryItem(item, amount)
         return true
-    elseif inv == 'qb_inventory' then
-        return player.Functions.AddItem(item, amount) == true
     end
 
     return false
@@ -178,15 +182,19 @@ function RemoveItem(source, item, amount)
     if amount <= 0 then return false end
 
     local inv = Config.Inventory
-    if inv == 'ox_inventory' or inv == 'auto' and GetResourceState('ox_inventory') == 'started' then
-        return exports.ox_inventory:RemoveItem(source, item, amount) == true
-    elseif inv == 'qs_inventory' then
-        return exports['qs-inventory']:RemoveItem(source, item, amount) == true
+    if inv == 'ox_inventory' or (inv == 'auto' and GetResourceState('ox_inventory') == 'started') then
+        local ok, res = pcall(function() return exports.ox_inventory:RemoveItem(source, item, amount) end)
+        return ok and res
+    elseif inv == 'qs_inventory' or (inv == 'auto' and GetResourceState('qs-inventory') == 'started') then
+        local ok, res = pcall(function() return exports['qs-inventory']:RemoveItem(source, item, amount) end)
+        return ok and res
+    elseif inv == 'qb_inventory' or (inv == 'auto' and GetResourceState('qb-inventory') == 'started') then
+        if player.Functions and player.Functions.RemoveItem then
+            return player.Functions.RemoveItem(item, amount)
+        end
     elseif Peak.Server.FrameworkName == 'esx' or inv == 'esx_inventory' then
         player.removeInventoryItem(item, amount)
         return true
-    elseif inv == 'qb_inventory' then
-        return player.Functions.RemoveItem(item, amount) == true
     end
 
     return false
@@ -204,16 +212,16 @@ function HasItem(source, itemData)
     local count    = 0
     local inv      = Config.Inventory
 
-    if inv == 'ox_inventory' or inv == 'auto' and GetResourceState('ox_inventory') == 'started' then
+    if inv == 'ox_inventory' or (inv == 'auto' and GetResourceState('ox_inventory') == 'started') then
         count = exports.ox_inventory:Search(source, 'count', itemData.name) or 0
-    elseif inv == 'qs_inventory' then
+    elseif inv == 'qs_inventory' or (inv == 'auto' and GetResourceState('qs-inventory') == 'started') then
         count = exports['qs-inventory']:GetItemTotalAmount(source, itemData.name) or 0
+    elseif inv == 'qb_inventory' or (inv == 'auto' and GetResourceState('qb-inventory') == 'started') then
+        local it = player.Functions.GetItemByName(itemData.name)
+        count = it and (it.amount or it.count) or 0
     elseif Peak.Server.FrameworkName == 'esx' or inv == 'esx_inventory' then
         local it = player.getInventoryItem(itemData.name)
         count = it and (it.count or it.amount) or 0
-    elseif inv == 'qb_inventory' then
-        local it = player.Functions.GetItemByName(itemData.name)
-        count = it and (it.amount or it.count) or 0
     end
 
     return tonumber(count) >= required

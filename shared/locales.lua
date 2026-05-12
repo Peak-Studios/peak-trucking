@@ -11,6 +11,8 @@ local translations = {
         ['deliver']                  = 'E - Deliver',
         ['finish_job']               = 'E - Finish Job',
         ['take_illegal']             = 'E - Take Illegal Job',
+        ['go_to_pickup']             = 'Go to the pickup point and load the goods.',
+        ['box_progress']             = 'Cargo Progress',
 
         -- Job feedback
         ['get_trailer']              = 'Get the trailer from the location marked on your map...',

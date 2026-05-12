@@ -8,6 +8,7 @@ local isDatabaseReady     = false
 local activeJobSessions   = {}
 local discordAvatarCache  = {}
 local paymentCooldowns    = {}
+local activeIllegalSessions = {}
 
 -- Start Job Session Tracking
 RegisterServerEvent("peak-trucking:StartJob")
@@ -420,23 +421,25 @@ AddEventHandler("peak-trucking:FinishJob", function(missionId, vehicleHealth, lo
       local finalPay = basePay - damagePenalty
 
       -- Check for illegal cargo bonus
-      if loadedIllegal then
-        local hasIllegalItem = HasItem(playerId, {
-          name = Config.IllegalNPC.item_name,
-          amount = 10
-        })
-
-        if hasIllegalItem then
-          finalPay = finalPay + Config.IllegalNPC.money
-          RemoveItem(playerId, Config.IllegalNPC.item_name, 10)
-        else
-          TriggerClientEvent("peak-trucking:createNotification", playerId, Config.Language.not_enough_illegal_box)
+      local serverSideIllegal = activeIllegalSessions[playerId]
+      if loadedIllegal and serverSideIllegal and serverSideIllegal.boxesLoaded >= 10 then
+        -- No longer checking inventory items, relying purely on server-side tracking
+        finalPay = finalPay + Config.IllegalNPC.money
+        
+        -- Add XP bonus
+        if Config.IllegalNPC.xp_bonus then
+          AddXP(playerId, Config.IllegalNPC.xp_bonus)
         end
-      else
+      elseif loadedIllegal then
+          -- If client says illegal but server doesn't agree
+          TriggerClientEvent("peak-trucking:createNotification", playerId, Config.Language.illegal_validation_failed or "Illegal cargo verification failed.")
           if Config.Debug then
-              print('[peak-trucking] loadedIllegal is false — skipping illegal item check.')
+              print('[peak-trucking] Illegal validation failed for ' .. playerId .. '. Server boxes: ' .. (serverSideIllegal and serverSideIllegal.boxesLoaded or 0))
           end
       end
+
+      -- Clean up illegal session
+      activeIllegalSessions[playerId] = nil
 
       -- Check for route extra payment
       local routeData = GetRouteByLabel(missionData.routes, routeLabel)
@@ -521,8 +524,33 @@ end
 -- ============================================================
 -- ILLEGAL CARGO
 -- ============================================================
+RegisterServerEvent("peak-trucking:AcceptIllegalDeal")
+AddEventHandler("peak-trucking:AcceptIllegalDeal", function()
+  local playerId = source
+  if activeJobSessions[playerId] then
+    activeIllegalSessions[playerId] = {
+      boxesLoaded = 0
+    }
+  end
+end)
+
 RegisterServerEvent("peak-trucking:GiveIllegalItem")
 AddEventHandler("peak-trucking:GiveIllegalItem", function()
   local playerId = source
-  AddInventoryItem(playerId, Config.IllegalNPC.item_name, 1)
+  
+  -- Security check: Verify the player actually has an active illegal session
+  local session = activeIllegalSessions[playerId]
+  if session and activeJobSessions[playerId] then
+    if session.boxesLoaded < 10 then
+      session.boxesLoaded = session.boxesLoaded + 1
+    else
+      if Config.Debug then
+        print('[peak-trucking] Player ' .. playerId .. ' attempted to get more than 10 illegal items.')
+      end
+    end
+  else
+    if Config.Debug then
+      print('[peak-trucking] Player ' .. playerId .. ' attempted to get illegal item without active illegal session.')
+    end
+  end
 end)
