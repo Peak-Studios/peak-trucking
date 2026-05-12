@@ -1,6 +1,6 @@
 {
   "peak-trucking": {
-    "version": "0.2.1",
-    "changelog": "Fixed HUD stuck issue and added ox_fuel support."
+    "version": "0.2.2",
+    "changelog": "- Refactored Illegal NPC interaction and added target system support.\n- Fixed HUD stuck issue and added ox_fuel support."
   }
 }
