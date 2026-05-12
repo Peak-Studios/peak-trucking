@@ -16,6 +16,8 @@ jobData = {
 --- Registers the interaction zone/prompt for the trucking NPC.
 --- Behavior adapts to the detected Config.InteractionHandler / Config.Target.
 function InitNPCInteraction()
+    while not Peak.Client.Ready do Wait(100) end
+    
     local npcCoords = vector3(Config.NpcLocation.coords.x, Config.NpcLocation.coords.y, Config.NpcLocation.coords.z)
     local illegalCoords = vector3(Config.IllegalNPC.coords.x, Config.IllegalNPC.coords.y, Config.IllegalNPC.coords.z)
     local target = Peak.Client.GetTargetSystem()

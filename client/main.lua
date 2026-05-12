@@ -140,15 +140,27 @@ function SpawnPed()
     DeleteEntity(npcPed)
   end
 
-  RequestModel(Config.NpcLocation.model)
-  while not HasModelLoaded(Config.NpcLocation.model) do
-    Wait(0)
+  local model = Config.NpcLocation.model
+  Peak.Utils.Debug("Spawning NPC with model:", model)
+  
+  RequestModel(model)
+  local timeout = 0
+  while not HasModelLoaded(model) and timeout < 100 do
+    Wait(10)
+    timeout = timeout + 1
   end
 
-  npcPed = CreatePed(0, Config.NpcLocation.model, Config.NpcLocation.coords, false, false)
+  if not HasModelLoaded(model) then
+    Peak.Utils.Warn("Failed to load NPC model:", model)
+    return
+  end
+
+  local coords = Config.NpcLocation.coords
+  npcPed = CreatePed(0, model, coords.x, coords.y, coords.z, coords.w, false, false)
   FreezeEntityPosition(npcPed, true)
   SetEntityInvincible(npcPed, true)
   SetBlockingOfNonTemporaryEvents(npcPed, true)
+  Peak.Utils.print("Trucker Job NPC spawned.")
 end
 
 function SpawnIllegalPed()
@@ -156,15 +168,27 @@ function SpawnIllegalPed()
     DeleteEntity(illegalNpcPed)
   end
 
-  RequestModel(Config.IllegalNPC.model)
-  while not HasModelLoaded(Config.IllegalNPC.model) do
-    Wait(0)
+  local model = Config.IllegalNPC.model
+  Peak.Utils.Debug("Spawning Illegal NPC with model:", model)
+
+  RequestModel(model)
+  local timeout = 0
+  while not HasModelLoaded(model) and timeout < 100 do
+    Wait(10)
+    timeout = timeout + 1
   end
 
-  illegalNpcPed = CreatePed(0, Config.IllegalNPC.model, Config.IllegalNPC.coords, false, false)
+  if not HasModelLoaded(model) then
+    Peak.Utils.Warn("Failed to load Illegal NPC model:", model)
+    return
+  end
+
+  local coords = Config.IllegalNPC.coords
+  illegalNpcPed = CreatePed(0, model, coords.x, coords.y, coords.z, coords.w, false, false)
   FreezeEntityPosition(illegalNpcPed, true)
   SetEntityInvincible(illegalNpcPed, true)
   SetBlockingOfNonTemporaryEvents(illegalNpcPed, true)
+  Peak.Utils.print("Illegal NPC spawned.")
 end
 
 AddEventHandler("onResourceStop", function(resourceName)
@@ -182,6 +206,11 @@ AddEventHandler("onResourceStop", function(resourceName)
 end)
 
 CreateThread(function()
+  -- Wait for framework to be ready
+  while not Peak.Client.Ready do
+    Wait(100)
+  end
+  
   SpawnPed()
   SpawnIllegalPed()
 end)
