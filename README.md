@@ -1,7 +1,7 @@
 # Peak Trucking
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](version.json)
+[![Version](https://img.shields.io/badge/version-0.2.2-blue.svg)](version.json)
 [![Discord](https://img.shields.io/badge/Discord-Peak_Studios-7289DA.svg)](https://discord.gg/gAqXUaVEMn)
 
 Peak Trucking is a premium open-source FiveM trucking resource with persistent driver progression, company trust, daily missions, leaderboards, legal freight, optional illegal cargo, and a React-based NUI dispatch tablet.
@@ -15,7 +15,7 @@ Peak Trucking is a premium open-source FiveM trucking resource with persistent d
 - Driver XP, levels, completed jobs, earnings, and recent work history
 - Daily mission progress and reset handling
 - Leaderboard data stored in SQL
-- Optional illegal cargo side job
+- Optional illegal cargo side job with target system integration (ox_target/qb-target)
 - Movable Job HUD via `/truckhud` command with persistence
 - Framework support for QBCore and ESX (modern and legacy)
 - Inventory support for `ox_inventory`, `qb_inventory`, `esx_inventory`, and `qs_inventory`
