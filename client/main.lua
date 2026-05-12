@@ -677,119 +677,161 @@ RegisterNUICallback("startJob", function(data, cb)
         Wait(2000)
       end
     end)
+  else
+    createNotification(Config.Language.mission_locked)
+  end
 
-    -- Illegal NPC interaction thread
-    CreateThread(function()
-      while DoesEntityExist(truckVehicle) do
-        local checkInterval = 1000
-        local playerCoords = GetEntityCoords(PlayerPedId())
-        local illegalNpcCoords = vector3(
-          Config.IllegalNPC.coords.x,
-          Config.IllegalNPC.coords.y,
-          Config.IllegalNPC.coords.z
-        )
-        local distanceToIllegalNpc = #(playerCoords - illegalNpcCoords)
+  Wait(5000)
+  isProcessingJob = false
+  ResolveNuiCallback(cb)
+end)
 
-        if distanceToIllegalNpc < 3.0 then
-          checkInterval = 0
-          DrawText3D(
-            Config.IllegalNPC.coords.x,
-            Config.IllegalNPC.coords.y,
-            Config.IllegalNPC.coords.z + 1.0,
-            Config.Language.take_illegal
-          )
+-- Standing logic for Illegal NPC moved to global scope for better responsiveness
+CreateThread(function()
+  while true do
+    local checkInterval = 1500
+    local playerPed = PlayerPedId()
+    local playerCoords = GetEntityCoords(playerPed)
+    local illegalNpcCoords = vector3(
+      Config.IllegalNPC.coords.x,
+      Config.IllegalNPC.coords.y,
+      Config.IllegalNPC.coords.z
+    )
+    local distanceToIllegalNpc = #(playerCoords - illegalNpcCoords)
 
-          if IsControlJustPressed(0, 38) then
-            createNotification(Config.Language.wait_call)
-            Wait(math.random(20000, 30000))
-            isAcceptedIllegal = true
-            NuiMessage("callillegal")
+    if distanceToIllegalNpc < 4.0 then
+      checkInterval = 0
+      DrawText3D(
+        Config.IllegalNPC.coords.x,
+        Config.IllegalNPC.coords.y,
+        Config.IllegalNPC.coords.z + 1.1,
+        Config.Language.take_illegal or "Press [E] for Illegal Dealings"
+      )
+
+      if IsControlJustPressed(0, 38) then
+        if not DoesEntityExist(truckVehicle) or not isJobActive then
+          createNotification(Config.Language.must_have_job or "You need an active trucker mission to deal with me.")
+        else
+          if isIllegalMissionActive then
+            createNotification(Config.Language.already_illegal or "You are already doing an illegal delivery.")
+          else
+            createNotification(Config.Language.wait_call or "Stay close, we'll call you if we have work...")
+            -- Hidden wait logic remains for immersion, but now we have a notification
+            SetTimeout(math.random(15000, 25000), function()
+              if #(GetEntityCoords(PlayerPedId()) - illegalNpcCoords) < 50.0 then
+                isAcceptedIllegal = true
+                NuiMessage("callillegal")
+              else
+                createNotification(Config.Language.too_far or "You wandered too far, the deal is off.")
+              end
+            end)
           end
         end
+      end
+    end
+    Wait(checkInterval)
+  end
+end)
 
-        if isAcceptedIllegal then
-          checkInterval = 0
-          if IsControlJustPressed(0, 246) then
-            NuiMessage("acceptillegal")
-            isIllegalMissionActive = true
-            Wait(11000)
-            NuiMessage("declineillegal")
-            isAcceptedIllegal = false
+-- Illegal Action Handlers
+CreateThread(function()
+  while true do
+    local wait = 1000
+    if isAcceptedIllegal then
+      wait = 0
+      if IsControlJustPressed(0, 246) then -- [Y] Accept
+        NuiMessage("acceptillegal")
+        isIllegalMissionActive = true
+        SetTimeout(11000, function()
+          NuiMessage("declineillegal")
+          isAcceptedIllegal = false
+        end)
 
-            -- Set blip to board location
-            if DoesBlipExist(routeBlip) then
-              RemoveBlip(routeBlip)
-            end
-            routeBlip = AddBlipForCoord(
+        -- Set blip to board location
+        if DoesBlipExist(routeBlip) then
+          RemoveBlip(routeBlip)
+        end
+        routeBlip = AddBlipForCoord(
+          Config.IllegalNPC.boardLocation.x,
+          Config.IllegalNPC.boardLocation.y,
+          Config.IllegalNPC.boardLocation.z
+        )
+        SetBlipColour(routeBlip, 5)
+        SetBlipRoute(routeBlip, true)
+        SetBlipRouteColour(routeBlip, 5)
+
+        -- Illegal box pickup logic
+        CreateThread(function()
+          local boxCount = 0
+          local hasBox = false
+
+          while isIllegalMissionActive and DoesEntityExist(truckVehicle) do
+            local pedCoords = GetEntityCoords(PlayerPedId())
+            local truckCoords = GetEntityCoords(truckVehicle)
+            local distToTruck = #(pedCoords - truckCoords)
+
+            local boardLocation = vector3(
               Config.IllegalNPC.boardLocation.x,
               Config.IllegalNPC.boardLocation.y,
               Config.IllegalNPC.boardLocation.z
             )
-            SetBlipColour(routeBlip, 5)
-            SetBlipRoute(routeBlip, true)
-            SetBlipRouteColour(routeBlip, 5)
+            local distToBoard = #(pedCoords - boardLocation)
 
-            -- Illegal box pickup logic
-            CreateThread(function()
-              local boxCount = 0
-              local hasBox = false
+            -- Carrying box to truck
+            if distToTruck < 2.0 and hasBox then
+              local vehCoords = GetEntityCoords(truckVehicle)
+              DrawMarker(2, vector3(vehCoords.x, vehCoords.y, vehCoords.z + 1.0), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 255, 255, 255, 255, true, false, false, true, false, false, false)
+              DrawText3D(vehCoords.x, vehCoords.y, vehCoords.z, Config.Language.load_box)
 
-              while DoesEntityExist(truckVehicle) do
-                local pedCoords = GetEntityCoords(PlayerPedId())
-                local truckCoords = GetEntityCoords(truckVehicle)
-                local distToTruck = #(pedCoords - truckCoords)
+              if IsControlJustPressed(0, 38) then
+                boxCount = boxCount + 1
+                hasBox = false
+                DeleteEntity(carryBoxProp)
+                ClearPedTasks(PlayerPedId())
+                TriggerServerEvent("peak-trucking:GiveIllegalItem")
 
-                local boardLocation = vector3(
-                  Config.IllegalNPC.boardLocation.x,
-                  Config.IllegalNPC.boardLocation.y,
-                  Config.IllegalNPC.boardLocation.z
-                )
-                local distToBoard = #(pedCoords - boardLocation)
+                if boxCount == 10 then
+                  ClearPedTasks(PlayerPedId())
+                  trailerAttached = true
+                  
+                  -- Update blip to next destination
+                  if currentPhase == 1 then
+                    if DoesBlipExist(routeBlip) then RemoveBlip(routeBlip) end
+                    routeBlip = AddBlipForCoord(selectedRoute.destination.x, selectedRoute.destination.y, selectedRoute.destination.z)
+                    SetBlipColour(routeBlip, 5)
+                    SetBlipRoute(routeBlip, true)
+                    SetBlipRouteColour(routeBlip, 5)
+                  end
+                  
+                  isIllegalMissionActive = false
+                  break
+                end
+                Wait(1000)
+              end
+            end
 
-                -- Carrying box to truck
-                if distToTruck < 2.0 and hasBox then
-                  local vehCoords = GetEntityCoords(truckVehicle)
-                  DrawMarker(2, vector3(vehCoords.x, vehCoords.y, vehCoords.z), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5,
-                    0.5, 255, 255, 255, 255, true, false, false, true, false, false, false)
-                  DrawMarker(2, vehCoords.x, vehCoords.y, vehCoords.z + 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5,
-                    255, 255, 255, 255, true, false, false, true, false, false, false)
-                  DrawText3D(vehCoords.x, vehCoords.y, vehCoords.z, Config.Language.load_box)
+            -- Pick up box from board location
+            if distToBoard < 5.0 and not hasBox then
+              DrawMarker(2, vector3(boardLocation.x, boardLocation.y, boardLocation.z), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 255, 255, 255, 255, true, false, false, true, false, false, false)
+              DrawText3D(Config.IllegalNPC.boardLocation.x, Config.IllegalNPC.boardLocation.y, Config.IllegalNPC.boardLocation.z, Config.Language.take_box)
 
-                  if IsControlJustPressed(0, 38) then
-                    boxCount = boxCount + 1
-                    hasBox = false
-                    DeleteEntity(carryBoxProp)
-                    ClearPedTasks(PlayerPedId())
-                    TriggerServerEvent("peak-trucking:GiveIllegalItem")
-
-                    if boxCount == 10 then
-                      ClearPedTasks(PlayerPedId())
-                      trailerAttached = true
-
-                      -- Update blip based on phase
-                      if currentPhase == 1 then
-                        if selectedMission.id == 16 then
-                          if DoesBlipExist(routeBlip) then
-                            RemoveBlip(routeBlip)
-                          end
-                          routeBlip = AddBlipForCoord(selectedRoute.board.x, selectedRoute.board.y, selectedRoute.board
-                            .z)
-                          SetBlipColour(routeBlip, 5)
-                          SetBlipRoute(routeBlip, true)
-                          SetBlipRouteColour(routeBlip, 5)
-                        else
-                          if selectedRoute.trailerSpawnAvaliableCoords then
-                            if DoesBlipExist(routeBlip) then
-                              RemoveBlip(routeBlip)
-                            end
-                            routeBlip = AddBlipForCoord(trailerSpawnLocation.x, trailerSpawnLocation.y,
-                              trailerSpawnLocation.z)
-                            SetBlipColour(routeBlip, 5)
-                            SetBlipRoute(routeBlip, true)
-                            SetBlipRouteColour(routeBlip, 5)
-                          end
-                        end
-                      end
+              if IsControlJustPressed(0, 38) then
+                AttachBoxToPed()
+                hasBox = true
+              end
+            end
+            Wait(0)
+          end
+        end)
+      elseif IsControlJustPressed(0, 249) then -- [N] Decline
+        NuiMessage("declineillegal")
+        isIllegalMissionActive = false
+        isAcceptedIllegal = false
+      end
+    end
+    Wait(wait)
+  end
+end)
 
                       if currentPhase == 2 then
                         if DoesBlipExist(routeBlip) then

@@ -16,97 +16,95 @@ jobData = {
 --- Registers the interaction zone/prompt for the trucking NPC.
 --- Behavior adapts to the detected Config.InteractionHandler / Config.Target.
 function InitNPCInteraction()
-    local npcCoords = vector3(
-        Config.NpcLocation.coords.x,
-        Config.NpcLocation.coords.y,
-        Config.NpcLocation.coords.z
-    )
-
+    local npcCoords = vector3(Config.NpcLocation.coords.x, Config.NpcLocation.coords.y, Config.NpcLocation.coords.z)
+    local illegalCoords = vector3(Config.IllegalNPC.coords.x, Config.IllegalNPC.coords.y, Config.IllegalNPC.coords.z)
     local target = Peak.Client.GetTargetSystem()
 
     if target == 'ox_target' then
         exports.ox_target:addBoxZone({
-            name       = 'trucker-npc',
-            coords     = npcCoords,
-            size       = vec3(3.6, 3.6, 3.6),
+            name = 'trucker-npc',
+            coords = npcCoords,
+            size = vec3(3.6, 3.6, 3.6),
             drawSprite = true,
-            options    = {
+            options = {
                 {
-                    name  = 'trucker-npc',
+                    name = 'trucker-npc',
                     event = 'peak-trucking:OpenMenu',
-                    icon  = 'fas fa-gears',
+                    icon = 'fas fa-gears',
                     label = L('open_menu'),
+                }
+            }
+        })
+
+        exports.ox_target:addBoxZone({
+            name = 'trucker-illegal-npc',
+            coords = illegalCoords,
+            size = vec3(3.6, 3.6, 3.6),
+            drawSprite = true,
+            options = {
+                {
+                    name = 'trucker-illegal-npc',
+                    onSelect = function()
+                    end,
+                    icon = 'fas fa-user-secret',
+                    label = L('talk_to_dealer') or "Talk to Dealer",
                 }
             }
         })
         return
     end
 
+    -- qb-target logic...
     if target == 'qb-target' then
-        exports['qb-target']:AddBoxZone(
-            'trucker-npc',
-            npcCoords,
-            1.5, 1.6,
-            {
-                name     = 'trucker-npc',
-                heading  = 12.0,
-                debugPoly = false,
-                minZ     = Config.NpcLocation.coords.z - 2,
-                maxZ     = Config.NpcLocation.coords.z + 2,
+        exports['qb-target']:AddBoxZone('trucker-npc', npcCoords, 1.5, 1.6, {
+            name = 'trucker-npc',
+            heading = 12.0,
+            debugPoly = false,
+            minZ = npcCoords.z - 2,
+            maxZ = npcCoords.z + 2,
+        }, {
+            options = {
+                {
+                    type = 'client',
+                    icon = 'fas fa-gears',
+                    label = L('open_menu'),
+                    action = function() TriggerEvent('peak-trucking:OpenMenu') end,
+                }
             },
-            {
-                options = {
-                    {
-                        num        = 1,
-                        type       = 'client',
-                        icon       = 'fas fa-gears',
-                        label      = L('open_menu'),
-                        targeticon = 'fas fa-gears',
-                        action     = function()
-                            TriggerEvent('peak-trucking:OpenMenu')
-                        end,
-                    }
-                },
-                distance = 3.5,
-            }
-        )
+            distance = 3.5,
+        })
         return
     end
 
-    -- Fallback: text UI with proximity loop (drawtext / qb_textui / esx_textui)
+    -- Fallback: text UI with proximity loop
     CreateThread(function()
         local showing = false
-        local npcZ    = Config.NpcLocation.coords.z + 1
-        local npcVec  = vector3(Config.NpcLocation.coords.x, Config.NpcLocation.coords.y, npcZ)
-
+        local showingIllegal = false
+        
         while true do
             local plyCoords = GetEntityCoords(PlayerPedId())
-            local dist      = #(npcVec - plyCoords)
-            local cd        = 1500
+            local dist = #(npcCoords - plyCoords)
+            local distIllegal = #(illegalCoords - plyCoords)
+            local cd = 1500
 
             if dist < 5.0 then
                 cd = 0
-
                 if not showing then
                     Peak.Client.ShowTextUI(L('open_menu'))
                     showing = true
                 end
-
-                if Config.InteractionHandler == 'drawtext' then
-                    DrawMarker(2, npcVec, 0, 0, 0, 0, 0, 0, 0.3, 0.2, 0.15, 255, 255, 255, 255, false, false, false, true, false, false, false)
-                    DrawText3D(npcVec.x, npcVec.y, npcVec.z, L('open_menu'))
+                if IsControlJustPressed(0, 38) then TriggerEvent('peak-trucking:OpenMenu') end
+            elseif distIllegal < 5.0 then
+                cd = 0
+                if not showingIllegal then
+                    Peak.Client.ShowTextUI(L('talk_to_dealer') or "Talk to Dealer")
+                    showingIllegal = true
                 end
-
-                if IsControlJustPressed(0, 38) then
-                    TriggerEvent('peak-trucking:OpenMenu')
-                end
+                -- Logic is handled in main.lua thread for E press
             else
-                if showing then
-                    Peak.Client.HideTextUI()
-                    showing = false
-                end
+                if showing then Peak.Client.HideTextUI() showing = false end
+                if showingIllegal then Peak.Client.HideTextUI() showingIllegal = false end
             end
-
             Wait(cd)
         end
     end)
