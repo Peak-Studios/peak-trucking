@@ -23,7 +23,7 @@ Config.Target = 'auto'
 -- Progress Bar: 'auto', 'progressbar', 'wait'
 Config.Progress = 'auto'
 
--- Fuel System: 'native', 'ox_fuel', 'legacyfuel', 'ps-fuel'
+-- Fuel System: 'native', 'ox_fuel', 'lc_fuel', 'legacyfuel', 'ps-fuel'
 Config.Fuel = 'ox_fuel'
 
 Config.Debug               = false
@@ -1348,6 +1348,8 @@ Config.SetVehicleFuel = function(vehicle, fuel_level)
   local system = Config.Fuel
   if system == 'ox_fuel' then
     Entity(vehicle).state.fuel = fuel_level
+  elseif system == 'lc_fuel' then
+    pcall(function() exports['lc_fuel']:SetFuel(vehicle, fuel_level) end)
   elseif system == 'legacyfuel' or system == 'LegacyFuel' then
     pcall(function() exports["LegacyFuel"]:SetFuel(vehicle, fuel_level) end)
   elseif system == 'ps-fuel' then

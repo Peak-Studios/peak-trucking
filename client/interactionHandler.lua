@@ -138,7 +138,7 @@ function SetPlayerJob()
     Wait(500)
 
     local data = Peak.Client.GetPlayerData()
-    if not data then return end
+    if not data or not data.job then return end
 
     local fw = Peak.Client.FrameworkName
     if fw == 'esx' then
@@ -146,9 +146,10 @@ function SetPlayerJob()
         jobData.job_grade_name = data.job.label
         jobData.job_grade      = tonumber(data.job.grade)
     else
+        local grade = data.job.grade or {}
         jobData.jobname        = data.job.name
         jobData.job_grade_name = data.job.label
-        jobData.job_grade      = data.job.grade.level
+        jobData.job_grade      = grade.level or grade.grade or 0
     end
 end
 

@@ -118,6 +118,9 @@ local function GetFuel(vehicle)
   local system = Config.Fuel
   if system == 'ox_fuel' then
     return Entity(vehicle).state.fuel or GetVehicleFuelLevel(vehicle)
+  elseif system == 'lc_fuel' then
+    local ok, fuel = pcall(function() return exports['lc_fuel']:GetFuel(vehicle) end)
+    return ok and fuel or GetVehicleFuelLevel(vehicle)
   elseif system == 'legacyfuel' or system == 'LegacyFuel' then
     return exports.LegacyFuel:GetFuel(vehicle)
   elseif system == 'ps-fuel' then
@@ -153,29 +156,43 @@ end)
 -- NPC SPAWNING
 -- ============================================================
 
+local function LoadPedModel(model, label)
+  local modelHash = type(model) == 'string' and GetHashKey(model) or model
+
+  if not modelHash or not IsModelInCdimage(modelHash) or not IsModelValid(modelHash) then
+    Peak.Utils.Warn(("Invalid %s model:"):format(label), model, "hash:", modelHash)
+    return nil
+  end
+
+  RequestModel(modelHash)
+  local timeout = 0
+  while not HasModelLoaded(modelHash) and timeout < 500 do
+    Wait(10)
+    timeout = timeout + 1
+  end
+
+  if not HasModelLoaded(modelHash) then
+    Peak.Utils.Warn(("Failed to load %s model:"):format(label), model, "hash:", modelHash)
+    return nil
+  end
+
+  return modelHash
+end
+
 --- Spawns the main trucking job NPC at Config.NpcLocation.
 function SpawnPed()
   if DoesEntityExist(npcPed) then
     DeleteEntity(npcPed)
   end
 
-  local model = Config.NpcLocation.model
-  Peak.Utils.Debug("Spawning NPC with model:", model)
-  
-  RequestModel(model)
-  local timeout = 0
-  while not HasModelLoaded(model) and timeout < 100 do
-    Wait(10)
-    timeout = timeout + 1
-  end
+  local model = LoadPedModel(Config.NpcLocation.model, "NPC")
+  if not model then return end
 
-  if not HasModelLoaded(model) then
-    Peak.Utils.Warn("Failed to load NPC model:", model)
-    return
-  end
+  Peak.Utils.Debug("Spawning NPC with model:", model)
 
   local coords = Config.NpcLocation.coords
   npcPed = CreatePed(0, model, coords.x, coords.y, coords.z, coords.w, false, false)
+  SetModelAsNoLongerNeeded(model)
   FreezeEntityPosition(npcPed, true)
   SetEntityInvincible(npcPed, true)
   SetBlockingOfNonTemporaryEvents(npcPed, true)
@@ -187,23 +204,14 @@ function SpawnIllegalPed()
     DeleteEntity(illegalNpcPed)
   end
 
-  local model = Config.IllegalNPC.model
+  local model = LoadPedModel(Config.IllegalNPC.model, "Illegal NPC")
+  if not model then return end
+
   Peak.Utils.Debug("Spawning Illegal NPC with model:", model)
-
-  RequestModel(model)
-  local timeout = 0
-  while not HasModelLoaded(model) and timeout < 100 do
-    Wait(10)
-    timeout = timeout + 1
-  end
-
-  if not HasModelLoaded(model) then
-    Peak.Utils.Warn("Failed to load Illegal NPC model:", model)
-    return
-  end
 
   local coords = Config.IllegalNPC.coords
   illegalNpcPed = CreatePed(0, model, coords.x, coords.y, coords.z, coords.w, false, false)
+  SetModelAsNoLongerNeeded(model)
   FreezeEntityPosition(illegalNpcPed, true)
   SetEntityInvincible(illegalNpcPed, true)
   SetBlockingOfNonTemporaryEvents(illegalNpcPed, true)
@@ -1227,7 +1235,7 @@ AddEventHandler("onResourceStart", function(resourceName)
 
   WaitNui()
   WaitCore()
-  WaitPlayer()
+  if not WaitPlayer() then return end
 
   while Core == nil do
     Wait(0)
@@ -1339,21 +1347,20 @@ function TrailerSpawnCoords(availableCoords)
 end
 
 function WaitPlayer()
-  if Config.Framework == "esx" or Config.Framework == "oldesx" then
-    while Core.GetPlayerData() == nil do
-      Wait(0)
+  local timeout = 0
+
+  while timeout < 500 do
+    local data = Peak.Client.GetPlayerData()
+    if data and data.job then
+      return true
     end
-    while Core.GetPlayerData().job == nil do
-      Wait(0)
-    end
-  else
-    while Core.Functions.GetPlayerData() == nil do
-      Wait(0)
-    end
-    while Core.Functions.GetPlayerData().metadata == nil do
-      Wait(0)
-    end
+
+    Wait(100)
+    timeout = timeout + 1
   end
+
+  Peak.Utils.Warn("Failed to load PlayerData.job")
+  return false
 end
 
 -- ============================================================

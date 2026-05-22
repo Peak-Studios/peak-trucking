@@ -1,6 +1,6 @@
 {
   "peak-trucking": {
-    "version": "0.2.4",
-    "changelog": "- Implemented server-side illegal mission tracking (Anti-Cheat).\n- Removed inventory item dependency for illegal boxes.\n- Added HUD progress indicator for loading cargo.\n- Fixed stuck Phone UI and multiple call logic.\n- Improved loading accuracy with truck bone detection."
+    "version": "0.2.5",
+    "changelog": "- Fixed NPC model loading after config/model changes, including quoted model names and clearer invalid model warnings.\n- Improved Qbox/QBCore player job loading so PlayerData.job is waited for before trucking data loads.\n- Added lc_fuel read/write support for truck fuel integration."
   }
 }

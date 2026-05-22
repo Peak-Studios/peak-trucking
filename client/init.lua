@@ -121,9 +121,13 @@ function Peak.Client.GetPlayerData()
     local obj = Peak.Client.FrameworkObject
 
     if fw == 'qbcore' or fw == 'qbox' then
-        return obj.Functions.GetPlayerData()
+        if obj and obj.Functions and obj.Functions.GetPlayerData then
+            return obj.Functions.GetPlayerData()
+        end
     elseif fw == 'esx' then
-        return obj.GetPlayerData()
+        if obj and obj.GetPlayerData then
+            return obj.GetPlayerData()
+        end
     end
 
     return nil
@@ -133,18 +137,19 @@ end
 --- @return table {name, label, grade, grade_name}
 function Peak.Client.GetPlayerJob()
     local data = Peak.Client.GetPlayerData()
-    if not data then
+    if not data or not data.job then
         return { name = 'unemployed', label = 'Unemployed', grade = 0, grade_name = '' }
     end
 
     local fw = Peak.Client.FrameworkName
     if fw == 'qbcore' or fw == 'qbox' then
         local job = data.job
+        local grade = job.grade or {}
         return {
             name       = job.name,
             label      = job.label,
-            grade      = job.grade.level or 0,
-            grade_name = job.grade.name or '',
+            grade      = grade.level or grade.grade or 0,
+            grade_name = grade.name or '',
         }
     elseif fw == 'esx' then
         local job = data.job
