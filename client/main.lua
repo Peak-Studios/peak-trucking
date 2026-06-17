@@ -10,6 +10,8 @@ local blipsList = {}
 local returnBlip = nil
 cam = false
 local routeBlip = false
+local truckBlip = false
+local trailerBlip = false
 local carryBoxProp = false
 local isProcessingJob = false
 local isJobActive = false
@@ -26,6 +28,7 @@ local currentPhase = 0
 local trailerAttached = false
 local isAcceptedIllegal = false
 local isPendingCall = false
+local activeJobToken = 0
 
 
 -- ============================================================
@@ -382,6 +385,87 @@ function setJobInfo(key, value)
   })
 end
 
+local function RemoveTrackedBlip(blip)
+  if blip and DoesBlipExist(blip) then
+    RemoveBlip(blip)
+  end
+end
+
+local function DeleteTrackedEntity(entity)
+  if entity and DoesEntityExist(entity) then
+    if IsEntityAVehicle(entity) then
+      DeleteVehicle(entity)
+    else
+      DeleteEntity(entity)
+    end
+  end
+end
+
+local function CleanupCarryBox()
+  if DoesEntityExist(carryBoxProp) then
+    DeleteEntity(carryBoxProp)
+  end
+  carryBoxProp = false
+  ClearPedTasks(PlayerPedId())
+end
+
+local function CancelActiveJob(reason, notifyPlayer)
+  local hadJob = isJobActive or DoesEntityExist(truckVehicle) or DoesEntityExist(trailerVehicle) or DoesEntityExist(attachedObject)
+
+  if not hadJob then
+    if notifyPlayer then
+      createNotification(Config.Language.no_active_job or "You do not have an active trucking job.")
+    end
+    return false
+  end
+
+  activeJobToken = activeJobToken + 1
+  setJobInfo("started", false)
+  setJobInfo("attachedTrailer", false)
+  setJobInfo("boxProgress", nil)
+
+  isJobActive = false
+  isProcessingJob = false
+  isIllegalMissionActive = false
+  isAcceptedIllegal = false
+  isPendingCall = false
+  illegal = false
+  trailerAttached = false
+  currentPhase = 0
+
+  CleanupCarryBox()
+
+  if DoesEntityExist(truckVehicle) then
+    Config.RemoveVehiclekey(GetVehicleNumberPlateText(truckVehicle), GetHashKey(truckVehicle), truckVehicle)
+  end
+
+  DeleteTrackedEntity(attachedObject)
+  DeleteTrackedEntity(trailerVehicle)
+  DeleteTrackedEntity(truckVehicle)
+
+  attachedObject = false
+  trailerVehicle = false
+  truckVehicle = false
+
+  DeleteWaypoint()
+  RemoveTrackedBlip(routeBlip)
+  RemoveTrackedBlip(returnBlip)
+  RemoveTrackedBlip(truckBlip)
+  RemoveTrackedBlip(trailerBlip)
+  routeBlip = false
+  returnBlip = false
+  truckBlip = false
+  trailerBlip = false
+
+  TriggerServerEvent("peak-trucking:CancelJob", reason or "cancelled")
+
+  if notifyPlayer then
+    createNotification(Config.Language.job_cancelled or "Trucking job cancelled.")
+  end
+
+  return true
+end
+
 function LoadPropDict(propName)
   while not HasModelLoaded(GetHashKey(propName)) do
     RequestModel(GetHashKey(propName))
@@ -445,38 +529,13 @@ CreateThread(function()
 end)
 
 RegisterNUICallback("stopJob", function(data, cb)
-  setJobInfo("started", false)
-  isJobActive = false
-  isProcessingJob = false
-  isIllegalMissionActive = false
-  illegal = false
-
-  if DoesEntityExist(trailerVehicle) then
-    DeleteVehicle(trailerVehicle)
-  end
-
-  if DoesEntityExist(attachedObject) then
-    if IsEntityAVehicle(attachedObject) then
-      DeleteVehicle(attachedObject)
-    else
-      DeleteEntity(attachedObject)
-    end
-  end
-
-  if DoesEntityExist(truckVehicle) then
-    Config.RemoveVehiclekey(GetVehicleNumberPlateText(truckVehicle), GetHashKey(truckVehicle), truckVehicle)
-    DeleteEntity(truckVehicle)
-  end
-
-  DeleteWaypoint()
-
-  if DoesBlipExist(routeBlip) then
-    RemoveBlip(routeBlip)
-  end
-
-  TriggerServerEvent("peak-trucking:StartJob", false)
+  CancelActiveJob("player_cancelled", true)
   ResolveNuiCallback(cb)
 end)
+
+RegisterCommand(Config.CancelJobCommand or "canceltrucking", function()
+  CancelActiveJob("player_command", true)
+end, false)
 
 RegisterNUICallback("startJob", function(data, cb)
   if isProcessingJob then
@@ -499,6 +558,8 @@ RegisterNUICallback("startJob", function(data, cb)
   selectedRoute = data.route
   selectedTruck = data.truck
   selectedMission = data.mission
+  activeJobToken = activeJobToken + 1
+  local jobToken = activeJobToken
 
   if not selectedRoute then
     createNotification("Route not found.")
@@ -511,6 +572,13 @@ RegisterNUICallback("startJob", function(data, cb)
     createNotification("Truck not found.")
     isProcessingJob = false
     ResolveNuiCallback(cb, { ok = false, error = "missing_truck" })
+    return
+  end
+
+  if not selectedMission then
+    createNotification("Mission not found.")
+    isProcessingJob = false
+    ResolveNuiCallback(cb, { ok = false, error = "missing_mission" })
     return
   end
 
@@ -553,13 +621,14 @@ RegisterNUICallback("startJob", function(data, cb)
       true
     )
 
-    CreateBlip(false, 477, 3, 0.8, "Truck", true, true, truckVehicle)
+    isJobActive = true
+    truckBlip = CreateBlip(false, 477, 3, 0.8, "Truck", true, true, truckVehicle)
 
     -- Spawn trailer if route has one
     if selectedRoute.trailerModel then
       CreateThread(function()
         local trailerSpawned = false
-        while not trailerSpawned do
+        while not trailerSpawned and isJobActive and activeJobToken == jobToken do
           local playerCoords = GetEntityCoords(PlayerPedId())
           local spawnLocation = vector3(trailerSpawnLocation.x, trailerSpawnLocation.y, trailerSpawnLocation.z)
           local distance = #(playerCoords - spawnLocation)
@@ -571,7 +640,7 @@ RegisterNUICallback("startJob", function(data, cb)
               false,
               trailerSpawnLocation.w
             )
-            CreateBlip(false, 479, 3, 0.8, "Trailer", true, true, trailerVehicle)
+            trailerBlip = CreateBlip(false, 479, 3, 0.8, "Trailer", true, true, trailerVehicle)
             trailerSpawned = true
           end
           Wait(1000)
@@ -583,7 +652,7 @@ RegisterNUICallback("startJob", function(data, cb)
     if selectedRoute.attachModel then
       CreateThread(function()
         local objectSpawned = false
-        while not objectSpawned do
+        while not objectSpawned and isJobActive and activeJobToken == jobToken do
           if DoesEntityExist(trailerVehicle) then
             -- Check if it's a vehicle or object
             if selectedRoute.attachModel == "apc" or selectedRoute.attachModel == "rhino" or selectedRoute.attachModel == "scarab" then
@@ -628,7 +697,6 @@ RegisterNUICallback("startJob", function(data, cb)
     createNotification(Config.Language.get_trailer)
     Close()
 
-    isJobActive = true
     setJobInfo("started", true)
     TriggerServerEvent("peak-trucking:StartJob", selectedMission.id)
     setJobInfo("attachedTrailer", false)
@@ -639,11 +707,50 @@ RegisterNUICallback("startJob", function(data, cb)
       currentPhase = 2
     end
 
+    CreateThread(function()
+      local trailerWasSpawned = false
+      local attachedObjectWasSpawned = false
+
+      while isJobActive and activeJobToken == jobToken do
+        if not DoesEntityExist(truckVehicle) or IsEntityDead(truckVehicle) then
+          CancelActiveJob("truck_destroyed", false)
+          createNotification(Config.Language.job_cancelled_vehicle_destroyed or "Trucking job cancelled because your truck was destroyed.")
+          return
+        end
+
+        if DoesEntityExist(trailerVehicle) then
+          trailerWasSpawned = true
+        end
+
+        if DoesEntityExist(attachedObject) then
+          attachedObjectWasSpawned = true
+        end
+
+        if selectedRoute.trailerModel and trailerWasSpawned and currentPhase < 3 then
+          if not DoesEntityExist(trailerVehicle) or IsEntityDead(trailerVehicle) then
+            CancelActiveJob("cargo_destroyed", false)
+            createNotification(Config.Language.job_cancelled_cargo_destroyed or "Trucking job cancelled because your cargo was destroyed.")
+            return
+          end
+        end
+
+        if selectedRoute.attachModel and attachedObjectWasSpawned and currentPhase < 3 then
+          if not DoesEntityExist(attachedObject) or IsEntityDead(attachedObject) then
+            CancelActiveJob("cargo_destroyed", false)
+            createNotification(Config.Language.job_cancelled_cargo_destroyed or "Trucking job cancelled because your cargo was destroyed.")
+            return
+          end
+        end
+
+        Wait(1500)
+      end
+    end)
+
     -- Ghost mode for spawn area
     if Config.EnableGhostMode then
       CreateThread(function()
         local isGhostActive = false
-        while DoesEntityExist(truckVehicle) do
+        while DoesEntityExist(truckVehicle) and isJobActive and activeJobToken == jobToken do
           local playerCoords = GetEntityCoords(PlayerPedId())
           local spawnCoords = vector3(Config.VehSpawn.x, Config.VehSpawn.y, Config.VehSpawn.z)
           local distance = #(playerCoords - spawnCoords)
@@ -666,7 +773,7 @@ RegisterNUICallback("startJob", function(data, cb)
 
     -- Key press handler for marking locations
     CreateThread(function()
-      while DoesEntityExist(truckVehicle) do
+      while DoesEntityExist(truckVehicle) and isJobActive and activeJobToken == jobToken do
         if IsControlJustPressed(0, Config.KeyPressed.mark_location.key) then
           if not isIllegalMissionActive then
             if currentPhase == 1 then
@@ -721,15 +828,17 @@ RegisterNUICallback("startJob", function(data, cb)
 
     -- Daily mission tracking
     CreateThread(function()
-      while DoesEntityExist(truckVehicle) do
+      while DoesEntityExist(truckVehicle) and isJobActive and activeJobToken == jobToken do
         Wait(60000)
-        TriggerServerEvent("peak-trucking:AddDailyMissionProcess", "on_the_roads")
+        if isJobActive and activeJobToken == jobToken then
+          TriggerServerEvent("peak-trucking:AddDailyMissionProcess", "on_the_roads")
+        end
       end
     end)
 
     -- Vehicle health and fuel monitoring
     CreateThread(function()
-      while DoesEntityExist(truckVehicle) do
+      while DoesEntityExist(truckVehicle) and isJobActive and activeJobToken == jobToken do
         setJobInfo("bodyHealth", GetVehicleBodyHealth(truckVehicle) / 10)
         setJobInfo("fuel", GetFuel(truckVehicle))
         Wait(2000)
@@ -750,7 +859,7 @@ RegisterNUICallback("startJob", function(data, cb)
         SetBlipRoute(routeBlip, true)
         SetBlipRouteColour(routeBlip, 5)
 
-        while DoesEntityExist(truckVehicle) do
+        while DoesEntityExist(truckVehicle) and isJobActive and activeJobToken == jobToken do
           local checkInterval = 1000
 
           local truckBackCoords = GetWorldPositionOfEntityBone(truckVehicle,
@@ -811,7 +920,7 @@ RegisterNUICallback("startJob", function(data, cb)
         end
       else
         -- Standard trailer missions
-        while selectedRoute.trailerSpawnAvaliableCoords and DoesEntityExist(truckVehicle) do
+        while selectedRoute.trailerSpawnAvaliableCoords and DoesEntityExist(truckVehicle) and isJobActive and activeJobToken == jobToken do
           local checkInterval = 1000
 
           local isTrailerAttached, vehicleTrailer = GetVehicleTrailerVehicle(truckVehicle)
@@ -841,6 +950,10 @@ RegisterNUICallback("startJob", function(data, cb)
         end
       end
 
+      if not isJobActive or activeJobToken ~= jobToken then
+        return
+      end
+
       -- After trailer attached, set destination blip
       if DoesBlipExist(routeBlip) then
         RemoveBlip(routeBlip)
@@ -855,7 +968,7 @@ RegisterNUICallback("startJob", function(data, cb)
       currentPhase = 2
 
       -- Drive to destination
-      while DoesEntityExist(truckVehicle) do
+      while DoesEntityExist(truckVehicle) and isJobActive and activeJobToken == jobToken do
         local checkInterval = 1000
         local playerCoords = GetEntityCoords(PlayerPedId())
         local destination = vector3(selectedRoute.destination.x, selectedRoute.destination.y, selectedRoute.destination
@@ -902,18 +1015,26 @@ RegisterNUICallback("startJob", function(data, cb)
 
                 createNotification(Config.Language.return_veh)
                 setJobInfo("started", false)
+                currentPhase = 3
 
                 -- Detach and delete trailer
                 if DoesEntityExist(trailerVehicle) then
                   DetachVehicleFromTrailer(truckVehicle)
+                  local deliveredTrailer = trailerVehicle
+                  local deliveredAttachedObject = attachedObject
+                  local deliveredTrailerBlip = trailerBlip
+                  trailerVehicle = false
+                  attachedObject = false
+                  trailerBlip = false
                   CreateThread(function()
                     Wait(Config.VehicleDeleteTimeout)
-                    DeleteVehicle(trailerVehicle)
-                    if DoesEntityExist(attachedObject) then
-                      if IsEntityAVehicle(attachedObject) then
-                        DeleteVehicle(attachedObject)
+                    RemoveTrackedBlip(deliveredTrailerBlip)
+                    DeleteTrackedEntity(deliveredTrailer)
+                    if DoesEntityExist(deliveredAttachedObject) then
+                      if IsEntityAVehicle(deliveredAttachedObject) then
+                        DeleteVehicle(deliveredAttachedObject)
                       else
-                        DeleteEntity(attachedObject)
+                        DeleteEntity(deliveredAttachedObject)
                       end
                     end
                   end)
@@ -932,10 +1053,14 @@ RegisterNUICallback("startJob", function(data, cb)
         Wait(checkInterval)
       end
 
+      if not isJobActive or activeJobToken ~= jobToken then
+        return
+      end
+
       -- Return truck to spawn
       currentPhase = 3
 
-      while DoesEntityExist(truckVehicle) do
+      while DoesEntityExist(truckVehicle) and isJobActive and activeJobToken == jobToken do
         local checkInterval = 1000
         local playerCoords = GetEntityCoords(PlayerPedId())
         local spawnCoords = vector3(Config.VehSpawn.x, Config.VehSpawn.y, Config.VehSpawn.z)
@@ -964,6 +1089,8 @@ RegisterNUICallback("startJob", function(data, cb)
             if DoesBlipExist(routeBlip) then
               RemoveBlip(routeBlip)
             end
+            RemoveTrackedBlip(truckBlip)
+            RemoveTrackedBlip(trailerBlip)
 
             isJobActive = false
             isIllegalMissionActive = false
@@ -983,9 +1110,12 @@ RegisterNUICallback("startJob", function(data, cb)
             TaskLeaveAnyVehicle(PlayerPedId(), 0, 0)
 
             -- Delete truck after timeout
+            local completedTruck = truckVehicle
+            truckVehicle = false
+            truckBlip = false
             CreateThread(function()
               Wait(Config.VehicleDeleteTimeout)
-              DeleteVehicle(truckVehicle)
+              DeleteTrackedEntity(completedTruck)
             end)
 
             -- Cleanup blips after 10s

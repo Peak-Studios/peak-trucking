@@ -16,6 +16,8 @@ Peak Trucking is a premium open-source FiveM trucking resource with persistent d
 - Daily mission progress and reset handling
 - Leaderboard data stored in SQL
 - Optional illegal cargo side job with target system integration (ox_target/qb-target)
+- Cancel active jobs from the dispatch UI or with `/canceltrucking`
+- Automatic job cancellation when the required truck, trailer, or attached cargo is destroyed
 - Movable Job HUD via `/truckhud` command with persistence
 - Framework support for QBCore and ESX (modern and legacy)
 - Inventory support for `ox_inventory`, `qb_inventory`, `esx_inventory`, and `qs_inventory`
@@ -64,6 +66,15 @@ The FiveM manifest loads `ui/dist/index.html`. Keep `ui/dist` in release archive
 - **[shared/config.lua](shared/config.lua)**: Framework, SQL driver, inventory, interactions, vehicles, missions, fuel, keys, XP, and gameplay settings.
 - **[shared/language.lua](shared/language.lua)**: UI and gameplay text strings.
 - **[server/server-config.lua](server/server-config.lua)**: Server-only optional settings such as Discord bot token and version checks.
+
+## Changelog
+
+### Unreleased
+
+- Added a configurable `/canceltrucking` command through `Config.CancelJobCommand`.
+- Improved the existing dispatch UI Cancel Job action so it clears truck, trailer, attached cargo, carried boxes, waypoints, blips, HUD state, and server job sessions.
+- Added automatic job cancellation when the active truck, required trailer, or attached cargo is destroyed.
+- Cleared server-side illegal cargo sessions when a job is canceled or the player disconnects.
 
 ## Publishing Notes
 

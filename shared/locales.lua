@@ -20,6 +20,9 @@ local translations = {
         ['return_veh']               = 'Return the vehicle to finish job and get payment...',
         ['wait_call']                = 'Wait for the call...',
         ['get_ready']                = 'Get Ready For Transport!',
+        ['job_cancelled']            = 'Trucking job cancelled.',
+        ['job_cancelled_cargo_destroyed'] = 'Trucking job cancelled because your cargo was destroyed.',
+        ['job_cancelled_vehicle_destroyed'] = 'Trucking job cancelled because your truck was destroyed.',
 
         -- Errors & validation
         ['cant_select_truck']        = "You can't select this truck in this mission!",
@@ -34,6 +37,7 @@ local translations = {
         ['leave_vehicle']            = 'Leave the vehicle!',
         ['stop_vehicle']             = 'Stop vehicle to deliver!',
         ['notaccessjob']             = "You don't have access to this job!",
+        ['no_active_job']            = 'You do not have an active trucking job.',
 
         -- UI labels
         ['transportation_stage']     = 'Transportation Stage',
