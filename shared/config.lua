@@ -147,6 +147,8 @@ Config.KeyPressed = {
   }
 }
 
+Config.CancelJobCommand = "canceltrucking"
+
 
 
 Config.VehSpawn = vector4(828.43, -3209.70, 5.89, 175.74)

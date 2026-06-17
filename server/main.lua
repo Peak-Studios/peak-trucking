@@ -14,12 +14,30 @@ local activeIllegalSessions = {}
 RegisterServerEvent("peak-trucking:StartJob")
 AddEventHandler("peak-trucking:StartJob", function(missionId)
   local playerId = source
+  if not missionId then
+    activeJobSessions[playerId] = nil
+    activeIllegalSessions[playerId] = nil
+    return
+  end
+
   activeJobSessions[playerId] = missionId
+end)
+
+RegisterServerEvent("peak-trucking:CancelJob")
+AddEventHandler("peak-trucking:CancelJob", function(reason)
+  local playerId = source
+  activeJobSessions[playerId] = nil
+  activeIllegalSessions[playerId] = nil
+
+  if Config.Debug then
+    print(("[peak-trucking] Player %s cancelled trucking job. Reason: %s"):format(playerId, tostring(reason or "unknown")))
+  end
 end)
 
 AddEventHandler("playerDropped", function()
   local playerId = source
   activeJobSessions[playerId] = nil
+  activeIllegalSessions[playerId] = nil
 end)
 
 -- Core Initialization
