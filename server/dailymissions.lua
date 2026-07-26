@@ -55,7 +55,7 @@ AddEventHandler('peak-trucking:AddDailyMissionProcess', function(key)
     end
 
     SyncPlayerDataByKey(src, 'dailymissions', playerData.dailymissions)
-    ExecuteSql(
+    ExecuteSqlAsync(
         'UPDATE peak_trucking SET `dailymissions` = :missions WHERE `identifier` = :id',
         { missions = json.encode(playerData.dailymissions), id = identifier }
     )
@@ -75,7 +75,7 @@ AddEventHandler('peak-trucking:CheckDailyMission', function()
         playerData.dailymissions.resetAt = os.time() + 86400
         playerData.dailymissions.data    = CreateDailyMission()
         SyncPlayerDataByKey(src, 'dailymissions', playerData.dailymissions)
-        ExecuteSql(
+        ExecuteSqlAsync(
             'UPDATE peak_trucking SET `dailymissions` = :missions WHERE `identifier` = :id',
             { missions = json.encode(playerData.dailymissions), id = identifier }
         )

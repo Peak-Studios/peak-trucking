@@ -1419,6 +1419,11 @@ CreateThread(function()
   WaitCore()
 end)
 
+RegisterNetEvent("peak-trucking:SyncAllPlayerData")
+AddEventHandler("peak-trucking:SyncAllPlayerData", function(data)
+  NuiMessage("SyncAllPlayerData", data)
+end)
+
 function PeakGetVehicles()
   return GetGamePool("CVehicle")
 end
@@ -1437,11 +1442,17 @@ function PeakEnumerateEntitiesWithinDistance(entities, useIndex, center, radius)
     center = GetEntityCoords(playerPed)
   end
 
+  local radiusSq = radius * radius
+  local cx, cy, cz = center.x, center.y, center.z
+
   for index, entity in pairs(entities) do
     local entityCoords = GetEntityCoords(entity)
-    local distance = #(center - entityCoords)
+    local dx = cx - entityCoords.x
+    local dy = cy - entityCoords.y
+    local dz = cz - entityCoords.z
+    local distSq = dx * dx + dy * dy + dz * dz
 
-    if radius >= distance then
+    if distSq <= radiusSq then
       local idx = #nearbyEntities + 1
       local val = entity
       if useIndex and index then

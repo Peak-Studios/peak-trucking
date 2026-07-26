@@ -64,6 +64,10 @@ export default function App() {
     if (!payload?.key) return
     setPlayerData((current) => ({ ...current, [payload.key]: payload.value }))
   }, []))
+  useNuiEvent<PlayerData>('SyncAllPlayerData', useCallback((payload) => {
+    if (!payload) return
+    setPlayerData(payload)
+  }, []))
   useNuiEvent<JobPayload>('setJobInfo', useCallback((payload) => {
     if (!payload?.key) return
     setJobInfo((current) => ({ ...current, [payload.key]: payload.value }))

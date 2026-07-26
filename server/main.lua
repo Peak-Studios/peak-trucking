@@ -52,67 +52,70 @@ CreateThread(function()
   -- Register callback for checking mission unlock status
   RegisterCallback("peak-trucking:CheckMissionUnlocked", function(playerId, cb, missionId)
     local playerData = GetPlayerJobData(playerId)
-    if playerData then
-      cb(playerData.unlockedMissions[tostring(missionId)])
+    if playerData and playerData.unlockedMissions then
+      cb(playerData.unlockedMissions[tostring(missionId)] or false)
     else
       cb(false)
     end
   end)
 
-  -- Load all player data from database
-  local allPlayerData = ExecuteSql("SELECT * FROM peak_trucking")
+  -- Cached Leaderboard Callback (Refreshed every 60s from DB)
+  local leaderboardCache = nil
+  local lastLeaderboardFetch = 0
 
-  for _, playerRecord in pairs(allPlayerData) do
-    playerRecord.unlockedMissions = json.decode(playerRecord.unlockedMissions)
-    playerRecord.dailymissions = json.decode(playerRecord.dailymissions)
-    playerRecord.history = json.decode(playerRecord.history)
-    playerRecord.points = json.decode(playerRecord.points)
-    table.insert(playerJobDataCache, playerRecord)
-  end
-
-  -- Register callback for leaderboard
   RegisterCallback("peak-trucking:GetLeaderboard", function(playerId, cb)
-    table.sort(playerJobDataCache, function(a, b)
-      return a.level > b.level
-    end)
-
-    local identifier = GetIdentifier(playerId)
-    local leaderboardData = { data = {} }
-
-    for index, playerData in pairs(playerJobDataCache) do
-      if index <= 8 then
-        table.insert(leaderboardData.data, playerData)
-      end
+    local currentTime = os.time()
+    if leaderboardCache and (currentTime - lastLeaderboardFetch) < 60 then
+      cb(leaderboardCache)
+      return
     end
 
-    cb(leaderboardData)
+    local results = ExecuteSql("SELECT identifier, points, history, avatar, name, unlockedMissions, dailymissions, totalEarnings, completedJobs, xp, level FROM peak_trucking ORDER BY level DESC, xp DESC LIMIT 8")
+    local leaderboardData = { data = {} }
+
+    for _, row in ipairs(results) do
+      if type(row.unlockedMissions) == "string" then row.unlockedMissions = json.decode(row.unlockedMissions) end
+      if type(row.dailymissions) == "string" then row.dailymissions = json.decode(row.dailymissions) end
+      if type(row.history) == "string" then row.history = json.decode(row.history) end
+      if type(row.points) == "string" then row.points = json.decode(row.points) end
+      table.insert(leaderboardData.data, row)
+    end
+
+    leaderboardCache = leaderboardData
+    lastLeaderboardFetch = currentTime
+    cb(leaderboardCache)
   end)
 
   isDatabaseReady = true
 end)
 
 -- ============================================================
--- DATABASE & PLAYER DATA HELPERS
+-- DATABASE & PLAYER DATA HELPERS (O(1) Hash Map)
 -- ============================================================
 
---- Blocks until the database cache is fully loaded.
-function waitDatabase()
-    while not isDatabaseReady do
-        Wait(0)
-    end
-end
-
---- Returns the cached job data for a player, or false if not found.
+--- Returns the cached job data for a player (lazy loaded from DB), or false if not found.
 --- @param playerId number
 --- @return table|false
 function GetPlayerJobData(playerId)
-    waitDatabase()
     local identifier = GetIdentifier(playerId)
-    for _, playerData in pairs(playerJobDataCache) do
-        if playerData.identifier == identifier then
-            return playerData
-        end
+    if not identifier then return false end
+
+    if playerJobDataCache[identifier] then
+        return playerJobDataCache[identifier]
     end
+
+    -- Lazy load from database if not yet cached
+    local result = ExecuteSql('SELECT * FROM peak_trucking WHERE identifier = :id', { id = identifier })
+    if result and result[1] then
+        local playerRecord = result[1]
+        playerRecord.unlockedMissions = type(playerRecord.unlockedMissions) == 'string' and json.decode(playerRecord.unlockedMissions) or playerRecord.unlockedMissions or {}
+        playerRecord.dailymissions    = type(playerRecord.dailymissions) == 'string' and json.decode(playerRecord.dailymissions) or playerRecord.dailymissions or {}
+        playerRecord.history          = type(playerRecord.history) == 'string' and json.decode(playerRecord.history) or playerRecord.history or {}
+        playerRecord.points           = type(playerRecord.points) == 'string' and json.decode(playerRecord.points) or playerRecord.points or {}
+        playerJobDataCache[identifier] = playerRecord
+        return playerRecord
+    end
+
     return false
 end
 
@@ -130,40 +133,38 @@ function SyncPlayerDataByKey(playerId, key, value)
     TriggerClientEvent('peak-trucking:SyncPlayerDataByKey', playerId, key, value)
 end
 
+--- Sends all player-data in a single consolidated network payload to the client.
+--- @param playerId number
+--- @param playerData table
+function SyncAllPlayerData(playerId, playerData)
+    if not playerData then return end
+    TriggerClientEvent('peak-trucking:SyncAllPlayerData', playerId, playerData)
+end
+
 -- ============================================================
--- DISCORD AVATAR
+-- DISCORD AVATAR (Asynchronous & Non-Blocking)
 -- ============================================================
-function DiscordRequest(method, endpoint, body)
-  local response = nil
+function DiscordRequest(method, endpoint, body, cb)
   local token = ServerConfig and ServerConfig.DiscordBotToken or ''
   if token == '' then
-    return { data = nil, code = 0, headers = {} }
+    if cb then cb({ data = nil, code = 0, headers = {} }) end
+    return
   end
 
   local authHeader = "Bot " .. token
 
   PerformHttpRequest("https://discordapp.com/api/" .. endpoint, function(code, data, headers)
-    response = {
-      data = data,
-      code = code,
-      headers = headers
-    }
+    if cb then
+      cb({ data = data, code = code, headers = headers })
+    end
   end, method, #body > 0 and json.encode(body) or "", {
     ["Content-Type"] = "application/json",
     ["Authorization"] = authHeader
   })
-
-  while response == nil do
-    Citizen.Wait(0)
-  end
-
-  return response
 end
 
 function GetDiscordAvatar(playerId)
   local discordId = nil
-  local avatarUrl = nil
-
   for _, identifier in ipairs(GetPlayerIdentifiers(playerId)) do
     if string.match(identifier, "discord:") then
       discordId = string.gsub(identifier, "discord:", "")
@@ -172,38 +173,42 @@ function GetDiscordAvatar(playerId)
   end
 
   if discordId then
-    -- Check cache first
-    if discordAvatarCache[discordId] == nil then
-      local endpoint = string.format("users/%s", discordId)
-      local response = DiscordRequest("GET", endpoint, {})
+    if discordAvatarCache[discordId] ~= nil then
+      return discordAvatarCache[discordId] or Config.DefaultImage
+    end
 
-      if response.code == 200 then
+    -- Perform non-blocking async request
+    DiscordRequest("GET", string.format("users/%s", discordId), {}, function(response)
+      local avatarUrl = nil
+      if response and response.code == 200 and response.data then
         local userData = json.decode(response.data)
         if userData and userData.avatar then
           local firstChar = userData.avatar:sub(1, 1)
           local secondChar = userData.avatar:sub(2, 2)
-
           if firstChar and secondChar == "_" then
             avatarUrl = "https://media.discordapp.net/avatars/" .. discordId .. "/" .. userData.avatar .. ".gif"
           else
             avatarUrl = "https://media.discordapp.net/avatars/" .. discordId .. "/" .. userData.avatar .. ".png"
           end
         end
-      else
-        return Config.DefaultImage
       end
 
+      avatarUrl = avatarUrl or Config.DefaultImage
       discordAvatarCache[discordId] = avatarUrl
-    else
-      avatarUrl = discordAvatarCache[discordId]
-    end
+
+      local pData = GetPlayerJobData(playerId)
+      if pData and pData.avatar ~= avatarUrl then
+        pData.avatar = avatarUrl
+        SyncPlayerDataByKey(playerId, "avatar", avatarUrl)
+        ExecuteSqlAsync("UPDATE peak_trucking SET `avatar` = :avatar WHERE `identifier` = :identifier", {
+          avatar = avatarUrl,
+          identifier = pData.identifier
+        })
+      end
+    end)
   end
 
-  if avatarUrl == nil or avatarUrl == false then
-    avatarUrl = Config.DefaultImage
-  end
-
-  return avatarUrl
+  return discordAvatarCache[discordId] or Config.DefaultImage
 end
 
 -- ============================================================
@@ -224,7 +229,7 @@ AddEventHandler("peak-trucking:UnlockMission", function(missionData)
     end
 
     local companyIndexStr = tostring(missionData.companyIndex)
-    local currentPoints = playerData.points[companyIndexStr]
+    local currentPoints = playerData.points[companyIndexStr] or 0
 
     -- Check if player has enough points
     if missionData.reqPoint <= currentPoints then
@@ -234,7 +239,7 @@ AddEventHandler("peak-trucking:UnlockMission", function(missionData)
       SyncPlayerDataByKey(playerId, "points", playerData.points)
       SyncPlayerDataByKey(playerId, "unlockedMissions", playerData.unlockedMissions)
 
-      ExecuteSql(
+      ExecuteSqlAsync(
           'UPDATE peak_trucking SET `unlockedMissions` = :missions, `points` = :points WHERE `identifier` = :id',
           {
               missions = json.encode(playerData.unlockedMissions),
@@ -264,7 +269,7 @@ function AddToHistory(playerId, label, supply, earnings)
       date = os.time()
     })
 
-    ExecuteSql(
+    ExecuteSqlAsync(
         'UPDATE peak_trucking SET `history` = :history WHERE `identifier` = :id',
         { history = json.encode(playerData.history), id = playerData.identifier }
     )
@@ -275,6 +280,8 @@ end
 -- Create New Player Data
 function CreatePlayerData(playerId)
   local identifier = GetIdentifier(playerId)
+  if not identifier then return end
+
   local playerData = GetPlayerJobData(playerId)
   local avatarUrl = GetDiscordAvatar(playerId)
 
@@ -283,7 +290,7 @@ function CreatePlayerData(playerId)
     if not playerData.avatar then
       playerData.avatar = avatarUrl or Config.DefaultImage
       SyncPlayerDataByKey(playerId, "avatar", avatarUrl)
-      ExecuteSql("UPDATE peak_trucking SET `avatar` = :avatar WHERE `identifier` = :identifier", {
+      ExecuteSqlAsync("UPDATE peak_trucking SET `avatar` = :avatar WHERE `identifier` = :identifier", {
         avatar = playerData.avatar or Config.DefaultImage,
         identifier = playerData.identifier
       })
@@ -323,7 +330,7 @@ function CreatePlayerData(playerId)
 
   -- Check if player already exists in database
   local existingData = ExecuteSql(
-      'SELECT * FROM peak_trucking WHERE identifier = :identifier',
+      'SELECT identifier FROM peak_trucking WHERE identifier = :identifier',
       { identifier = identifier }
   )
   if existingData[1] then
@@ -333,10 +340,10 @@ function CreatePlayerData(playerId)
       return
   end
 
-  -- Add to cache and database
-  table.insert(playerJobDataCache, newPlayerData)
+  -- Add to cache index by identifier
+  playerJobDataCache[identifier] = newPlayerData
 
-  ExecuteSql(
+  ExecuteSqlAsync(
   "INSERT INTO peak_trucking (identifier, points, unlockedMissions, dailymissions, xp, level, totalEarnings, completedJobs, name, avatar, history) VALUES (:identifier, :points, :unlockedMissions, :dailymissions, :xp, :level, :totalEarnings, :completedJobs, :name, :avatar, :history)",
     {
       identifier = newPlayerData.identifier,
@@ -360,17 +367,8 @@ function LoadPlayerData(playerId)
   local playerData = GetPlayerJobData(playerId)
 
   if playerData then
-    SyncPlayerDataByKey(playerId, "identifier", playerData.identifier)
-    SyncPlayerDataByKey(playerId, "points", playerData.points)
-    SyncPlayerDataByKey(playerId, "history", playerData.history)
-    SyncPlayerDataByKey(playerId, "unlockedMissions", playerData.unlockedMissions)
-    SyncPlayerDataByKey(playerId, "dailymissions", playerData.dailymissions)
-    SyncPlayerDataByKey(playerId, "xp", playerData.xp)
-    SyncPlayerDataByKey(playerId, "name", playerData.name)
-    SyncPlayerDataByKey(playerId, "totalEarnings", playerData.totalEarnings)
-    SyncPlayerDataByKey(playerId, "completedJobs", playerData.completedJobs)
-    SyncPlayerDataByKey(playerId, "level", playerData.level)
-    SyncPlayerDataByKey(playerId, "avatar", GetDiscordAvatar(playerId))
+    playerData.avatar = GetDiscordAvatar(playerId)
+    SyncAllPlayerData(playerId, playerData)
   else
     CreatePlayerData(playerId)
   end
@@ -494,7 +492,7 @@ AddEventHandler("peak-trucking:FinishJob", function(missionId, vehicleHealth, lo
       AddXP(playerId, math.random(Config.GiveXP.min, Config.GiveXP.max))
 
       -- Save to database
-      ExecuteSql(
+      ExecuteSqlAsync(
           'UPDATE peak_trucking SET `totalEarnings` = :earnings, `points` = :points, `completedJobs` = :jobs WHERE `identifier` = :id',
           {
               earnings = playerData.totalEarnings,

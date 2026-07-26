@@ -183,6 +183,9 @@ end
 --- @param z number
 --- @param text string
 function DrawText3D(x, y, z, text)
+    local onScreen, _x, _y = World3dToScreen2d(x, y, z)
+    if not onScreen then return end
+
     SetTextScale(0.35, 0.35)
     SetTextFont(4)
     SetTextProportional(1)

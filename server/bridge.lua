@@ -75,37 +75,63 @@ end
 -- DATABASE BRIDGE
 -- ============================================================
 
---- Executes a SQL query and waits for the result.
---- The SQL driver is auto-detected by server/init.lua.
+--- Executes a SQL query synchronously using promises/exports without spin-wait loops.
 --- @param query string
 --- @param params? table
 --- @return table
 function ExecuteSql(query, params)
-    local waiting = true
-    local result  = {}
-    local driver  = exports['peak-trucking']:GetSQLDriver()
+    params = params or {}
+    local driver = exports['peak-trucking']:GetSQLDriver()
 
     if driver == 'oxmysql' then
-        exports.oxmysql:execute(query, params or {}, function(data)
-            result  = data or {}
-            waiting = false
-        end)
+        if MySQL and MySQL.query and MySQL.query.await then
+            return MySQL.query.await(query, params) or {}
+        else
+            local p = promise.new()
+            exports.oxmysql:execute(query, params, function(data)
+                p:resolve(data or {})
+            end)
+            return Citizen.Await(p)
+        end
     elseif driver == 'ghmattimysql' then
-        exports.ghmattimysql:execute(query, params or {}, function(data)
-            result  = data or {}
-            waiting = false
+        local p = promise.new()
+        exports.ghmattimysql:execute(query, params, function(data)
+            p:resolve(data or {})
         end)
+        return Citizen.Await(p)
     elseif driver == 'mysql-async' then
-        MySQL.Async.fetchAll(query, params or {}, function(data)
-            result  = data or {}
-            waiting = false
-        end)
-    else
-        error(('Unsupported SQL driver: %s'):format(tostring(driver)))
+        if MySQL and MySQL.Async and MySQL.Async.fetchAll then
+            local p = promise.new()
+            MySQL.Async.fetchAll(query, params, function(data)
+                p:resolve(data or {})
+            end)
+            return Citizen.Await(p)
+        end
     end
 
-    while waiting do Wait(0) end
-    return result
+    return {}
+end
+
+--- Executes a SQL query asynchronously without blocking the calling thread.
+--- @param query string
+--- @param params? table
+function ExecuteSqlAsync(query, params)
+    params = params or {}
+    local driver = exports['peak-trucking']:GetSQLDriver()
+
+    if driver == 'oxmysql' then
+        if MySQL and MySQL.query then
+            MySQL.query(query, params)
+        else
+            exports.oxmysql:execute(query, params)
+        end
+    elseif driver == 'ghmattimysql' then
+        exports.ghmattimysql:execute(query, params)
+    elseif driver == 'mysql-async' then
+        if MySQL and MySQL.Async and MySQL.Async.execute then
+            MySQL.Async.execute(query, params)
+        end
+    end
 end
 
 -- ============================================================

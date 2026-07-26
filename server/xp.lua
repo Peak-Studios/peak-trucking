@@ -29,7 +29,7 @@ function AddLevel(source)
     SyncPlayerDataByKey(source, 'xp',               myData.xp)
     SyncPlayerDataByKey(source, 'level',             myData.level)
 
-    ExecuteSql(
+    ExecuteSqlAsync(
         'UPDATE peak_trucking SET `level` = :level, `xp` = :xp, `unlockedMissions` = :missions WHERE `identifier` = :id',
         {
             level    = myData.level,
@@ -69,7 +69,7 @@ function AddXP(source, xp)
         SyncPlayerDataByKey(source, 'xp', myData.xp)
     end
 
-    ExecuteSql(
+    ExecuteSqlAsync(
         'UPDATE peak_trucking SET `level` = :level, `xp` = :xp WHERE `identifier` = :id',
         { level = myData.level, xp = myData.xp, id = identifier }
     )
