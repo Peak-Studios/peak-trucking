@@ -63,6 +63,10 @@ export function JobHud({ jobInfo, language, keybinds, isEditing }: Props) {
     void fetchNui('save_hud_pos')
   }
 
+  const handleCancel = () => {
+    void fetchNui('stopJob')
+  }
+
   if (!jobInfo.started && !isEditing) return null
 
   return (
@@ -103,7 +107,11 @@ export function JobHud({ jobInfo, language, keybinds, isEditing }: Props) {
             <div className="key-row">
               <kbd>H</kbd><span>{language.detach_trailer ?? 'Detach Trailer'}</span>
               <kbd>{keybinds.mark_location?.label ?? 'G'}</kbd><span>{language.mark_location ?? 'Mark Location'}</span>
+              <kbd>/canceltrucking</kbd><span>{language.cancel_job ?? 'Cancel Job'}</span>
             </div>
+            <button className="cancel-job-btn" onClick={handleCancel}>
+              {language.cancel_job ?? 'Cancel Job'}
+            </button>
           </>
         )}
       </div>

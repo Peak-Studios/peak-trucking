@@ -6,3 +6,4 @@ ui/vite.config.d.ts
 *.log
 *.tmp
 server/server-config.local.lua
+.agents/

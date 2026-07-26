@@ -377,6 +377,36 @@ end
 -- JOB INFO & PROP HELPERS
 -- ============================================================
 
+--- Checks if a vehicle is unusable (destroyed, submerged, dead, or non-driveable).
+--- @param veh number Vehicle entity handle
+--- @return boolean
+function IsVehicleUnusable(veh)
+  if not veh or not DoesEntityExist(veh) then return true end
+  if IsEntityDead(veh) then return true end
+  if IsEntityInWater(veh) then return true end
+  if IsEntityOnFire(veh) then return true end
+  if GetVehicleEngineHealth(veh) <= 0.0 then return true end
+  if GetVehicleBodyHealth(veh) <= 0.0 then return true end
+  if GetEntityHealth(veh) <= 0 then return true end
+  if not IsVehicleDriveable(veh, false) then return true end
+  return false
+end
+
+--- Checks if an entity (vehicle or object) is unusable.
+--- @param entity number Entity handle
+--- @return boolean
+function IsEntityUnusable(entity)
+  if not entity or not DoesEntityExist(entity) then return true end
+  if IsEntityAVehicle(entity) then
+    return IsVehicleUnusable(entity)
+  end
+  if IsEntityDead(entity) then return true end
+  if IsEntityInWater(entity) then return true end
+  if IsEntityOnFire(entity) then return true end
+  if GetEntityHealth(entity) <= 0 then return true end
+  return false
+end
+
 --- Sends a job HUD key-value update to the NUI.
 function setJobInfo(key, value)
   NuiMessage("setJobInfo", {
@@ -384,6 +414,7 @@ function setJobInfo(key, value)
     value = value
   })
 end
+
 
 local function RemoveTrackedBlip(blip)
   if blip and DoesBlipExist(blip) then
@@ -536,6 +567,11 @@ end)
 RegisterCommand(Config.CancelJobCommand or "canceltrucking", function()
   CancelActiveJob("player_command", true)
 end, false)
+
+CreateThread(function()
+  TriggerEvent("chat:addSuggestion", "/" .. (Config.CancelJobCommand or "canceltrucking"), "Cancel active trucking job")
+end)
+
 
 RegisterNUICallback("startJob", function(data, cb)
   if isProcessingJob then
@@ -712,7 +748,7 @@ RegisterNUICallback("startJob", function(data, cb)
       local attachedObjectWasSpawned = false
 
       while isJobActive and activeJobToken == jobToken do
-        if not DoesEntityExist(truckVehicle) or IsEntityDead(truckVehicle) then
+        if IsVehicleUnusable(truckVehicle) then
           CancelActiveJob("truck_destroyed", false)
           createNotification(Config.Language.job_cancelled_vehicle_destroyed or "Trucking job cancelled because your truck was destroyed.")
           return
@@ -727,7 +763,7 @@ RegisterNUICallback("startJob", function(data, cb)
         end
 
         if selectedRoute.trailerModel and trailerWasSpawned and currentPhase < 3 then
-          if not DoesEntityExist(trailerVehicle) or IsEntityDead(trailerVehicle) then
+          if IsVehicleUnusable(trailerVehicle) then
             CancelActiveJob("cargo_destroyed", false)
             createNotification(Config.Language.job_cancelled_cargo_destroyed or "Trucking job cancelled because your cargo was destroyed.")
             return
@@ -735,16 +771,17 @@ RegisterNUICallback("startJob", function(data, cb)
         end
 
         if selectedRoute.attachModel and attachedObjectWasSpawned and currentPhase < 3 then
-          if not DoesEntityExist(attachedObject) or IsEntityDead(attachedObject) then
+          if IsEntityUnusable(attachedObject) then
             CancelActiveJob("cargo_destroyed", false)
             createNotification(Config.Language.job_cancelled_cargo_destroyed or "Trucking job cancelled because your cargo was destroyed.")
             return
           end
         end
 
-        Wait(1500)
+        Wait(500)
       end
     end)
+
 
     -- Ghost mode for spawn area
     if Config.EnableGhostMode then
@@ -1362,6 +1399,8 @@ AddEventHandler("onResourceStart", function(resourceName)
   if GetCurrentResourceName() ~= resourceName then
     return
   end
+
+  TriggerEvent("chat:addSuggestion", "/" .. (Config.CancelJobCommand or "canceltrucking"), "Cancel active trucking job")
 
   WaitNui()
   WaitCore()

@@ -883,6 +883,8 @@ img {
 
 .key-row {
   gap: 7px;
+  row-gap: 6px;
+  flex-wrap: wrap;
   margin-top: 14px;
   color: var(--muted);
   font-size: 12px;
@@ -891,6 +893,7 @@ img {
 kbd {
   min-width: 26px;
   height: 24px;
+  padding: 0 6px;
   display: inline-grid;
   place-items: center;
   border: 1px solid var(--line);
@@ -900,6 +903,37 @@ kbd {
   font-family: inherit;
   font-size: 11px;
   font-weight: 900;
+}
+
+.cancel-job-btn {
+  width: 100%;
+  margin-top: 14px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 115, 92, 0.4);
+  border-radius: 8px;
+  color: var(--danger);
+  background: rgba(255, 115, 92, 0.12);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.cancel-job-btn:hover {
+  border-color: var(--danger);
+  background: rgba(255, 115, 92, 0.28);
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(255, 115, 92, 0.35);
+}
+
+.cancel-job-btn:active {
+  transform: scale(0.98);
 }
 
 .notifications {
